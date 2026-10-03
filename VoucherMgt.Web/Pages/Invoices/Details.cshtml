@@ -1,0 +1,66 @@
+@page
+@model VoucherMgt.Web.Pages.Invoices.DetailsModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = Model.Item!.Number;
+    ViewData["Icon"] = "bi-receipt-cutoff";
+    var item = Model.Item;
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>@item.Number <span class="badge @StatusText.Badge(item.Status)">@item.Status</span></h1>
+            <p>@item.Direction · @item.PartyName · @item.InvoiceDate.ToString("dd MMM yyyy")
+                @if (item.OrderForm is not null)
+                {
+                    <span> · Order <a asp-page="/Orders/Details" asp-route-id="@item.OrderFormId">@item.OrderForm.Number</a></span>
+                }
+            </p>
+        </div>
+        @if (item.Status == InvoiceStatus.Draft)
+        {
+            <a class="btn btn-outline-primary" asp-page="Edit" asp-route-id="@item.Id">Edit</a>
+        }
+    </div>
+    <p>Net @Money.FormatPair(item.NetUgx, item.NetUsd) · VAT @Money.FormatPair(item.VatUgx, item.VatUsd) · <strong>Gross @Money.FormatPair(item.GrossUgx, item.GrossUsd)</strong></p>
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Description</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+            @foreach (var line in item.Lines.OrderBy(l => l.LineNumber))
+            {
+                <tr>
+                    <td>@line.Description</td>
+                    <td class="text-end">@line.Quantity.ToString("0.##")</td>
+                    <td class="text-end">@Money.Format(line.UnitPrice, line.Currency)</td>
+                    <td class="text-end">@Money.Format(line.Amount, line.Currency)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mb-3">
+        @if (Model.CanCreate && item.Status == InvoiceStatus.Draft)
+        {
+            <form method="post" asp-page-handler="Issue"><button class="btn btn-primary" type="submit">Issue invoice</button></form>
+        }
+        @if (Model.CanApprove && item.Status == InvoiceStatus.Issued)
+        {
+            <form method="post" asp-page-handler="Approve"><button class="btn btn-primary" type="submit">Approve</button></form>
+        }
+        @if (Model.CanApprove && item.Status is not (InvoiceStatus.Paid or InvoiceStatus.Cancelled))
+        {
+            <form method="post" asp-page-handler="Cancel"><button class="btn btn-outline-primary" type="submit">Cancel</button></form>
+        }
+    </div>
+    @if (Model.CanPay && item.Status is InvoiceStatus.Issued or InvoiceStatus.Approved)
+    {
+        <form method="post" asp-page-handler="Pay" class="row g-2 align-items-end">
+            <div class="col-md-3"><label class="form-label">Pay UGX</label><input class="form-control" asp-for="Payment.AmountUgx" type="number" step="1" /></div>
+            <div class="col-md-3"><label class="form-label">Pay USD</label><input class="form-control" asp-for="Payment.AmountUsd" type="number" step="0.01" /></div>
+            <div class="col-md-3"><label class="form-label">Reference</label><input class="form-control" asp-for="Payment.Reference" /></div>
+            <div class="col-md-3"><button class="btn btn-primary" type="submit">Record payment</button></div>
+        </form>
+    }
+</div>

@@ -1,0 +1,11 @@
+@page
+@{
+    ViewData["Title"] = "Access denied";
+    ViewData["Icon"] = "bi-shield-lock";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <h1 class="h4">You do not have permission for that page</h1>
+    <p class="text-muted">Ask an administrator to assign the role that covers this work.</p>
+    <a class="btn btn-primary" asp-page="/Index">Back to dashboard</a>
+</div>

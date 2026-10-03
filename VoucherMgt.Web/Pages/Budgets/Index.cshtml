@@ -1,0 +1,85 @@
+@page
+@model VoucherMgt.Web.Pages.Budgets.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Budgets";
+    ViewData["Icon"] = "bi-pie-chart";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading"><div><h1>Budgets</h1><p>Provisional periods that requisition lines can be charged against.</p></div></div>
+    <div class="table-responsive mb-4">
+        <table class="table table-hover">
+            <thead><tr><th>Period</th><th>Dates</th><th class="text-end">Provision</th></tr></thead>
+            <tbody>
+            @foreach (var period in Model.Periods)
+            {
+                var total = period.Lines.Where(l => l.Currency == Money.Ugx).Sum(l => l.Amount);
+                <tr>
+                    <td><a asp-page="Details" asp-route-id="@period.Id">@period.Name</a></td>
+                    <td>@period.StartsOn.ToString("dd MMM yyyy") – @period.EndsOn.ToString("dd MMM yyyy")</td>
+                    <td class="text-end">@Money.Format(total, Money.Ugx)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.CanManage)
+    {
+        <h2 class="h5">New period</h2>
+        <form method="post">
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" asp-for="Draft.Name" /></div>
+                <div class="col-md-3"><label class="form-label">Starts</label><input class="form-control" asp-for="Draft.StartsOn" type="date" /></div>
+                <div class="col-md-3"><label class="form-label">Ends</label><input class="form-control" asp-for="Draft.EndsOn" type="date" /></div>
+            </div>
+            <div class="table-responsive mt-3">
+                <table class="table" id="budgetLines">
+                    <thead><tr><th>Description</th><th>Amount UGX</th><th>Category</th><th></th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><input class="form-control" name="Draft.Lines[0].Description" /></td>
+                            <td><input class="form-control" type="number" step="1" name="Draft.Lines[0].Amount" /></td>
+                            <td>
+                                <select class="form-select" name="Draft.Lines[0].CategoryId">
+                                    <option value="">—</option>
+                                    @foreach (var category in Model.Categories)
+                                    {
+                                        <option value="@category.Id">@category.Code. @category.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <button class="btn btn-outline-primary" type="button" id="addBudgetLine">Add line</button>
+            <button class="btn btn-primary ms-2" type="submit">Save budget</button>
+        </form>
+        <template id="budgetLineTemplate">
+            <tr>
+                <td><input class="form-control" name="Draft.Lines[__i__].Description" /></td>
+                <td><input class="form-control" type="number" step="1" name="Draft.Lines[__i__].Amount" /></td>
+                <td>
+                    <select class="form-select" name="Draft.Lines[__i__].CategoryId">
+                        <option value="">—</option>
+                        @foreach (var category in Model.Categories)
+                        {
+                            <option value="@category.Id">@category.Code. @category.Name</option>
+                        }
+                    </select>
+                </td>
+                <td><button class="btn btn-sm btn-outline-primary" type="button" onclick="this.closest('tr').remove()">Remove</button></td>
+            </tr>
+        </template>
+    }
+</div>
+@section Scripts {
+<script>
+    document.getElementById('addBudgetLine')?.addEventListener('click', () => {
+        const body = document.querySelector('#budgetLines tbody');
+        body.insertAdjacentHTML('beforeend', document.getElementById('budgetLineTemplate').innerHTML.replaceAll('__i__', body.rows.length));
+    });
+</script>
+}

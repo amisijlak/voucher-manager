@@ -1,0 +1,26 @@
+<Project>
+  <!--
+    Smart App Control (WDAC) can block unsigned local VoucherMgt.*.dll loads with 0x800711C7.
+    Sign each project output after build. VoucherMgt.Web compiles BLL sources into itself
+    so VoucherMgt.BLL.dll is not required at runtime.
+  -->
+  <Target Name="SignVoucherMgtAssembly"
+          AfterTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' AND '$(TargetExt)' == '.dll' AND $([System.String]::Copy('$(MSBuildProjectName)').StartsWith('VoucherMgt'))">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)build\Sign-VoucherMgtAssemblies.ps1&quot; -Path &quot;$(TargetPath)&quot;"
+          StandardOutputImportance="low"
+          StandardErrorImportance="high" />
+  </Target>
+
+  <Target Name="SignVoucherMgtWebOutputAssemblies"
+          AfterTargets="RemoveBlockedVoucherMgtBllDll;Build"
+          Condition="'$(OS)' == 'Windows_NT' AND '$(MSBuildProjectName)' == 'VoucherMgt.Web'">
+    <ItemGroup>
+      <_VoucherOutDll Include="$(OutputPath)VoucherMgt.*.dll" Exclude="$(OutputPath)VoucherMgt.BLL.dll" />
+    </ItemGroup>
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)build\Sign-VoucherMgtAssemblies.ps1&quot; -Path &quot;%(_VoucherOutDll.FullPath)&quot;"
+          Condition="'@(_VoucherOutDll)' != ''"
+          StandardOutputImportance="low"
+          StandardErrorImportance="high" />
+  </Target>
+</Project>

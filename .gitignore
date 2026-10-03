@@ -1,0 +1,6 @@
+App_Data/
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.pfx

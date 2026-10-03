@@ -1,0 +1,34 @@
+@page
+@model VoucherMgt.Web.Pages.Account.UserRolesModel
+@{
+    ViewData["Title"] = "User roles";
+    ViewData["Icon"] = "bi-people";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading"><div><h1>User roles</h1><p>Roles carry the permissions. Admin bypasses individual permission checks.</p></div></div>
+    <table class="table">
+        <thead><tr><th>User</th><th>Roles</th><th>Assign</th></tr></thead>
+        <tbody>
+        @foreach (var user in Model.Users)
+        {
+            <tr>
+                <td>@user.FullName<div class="small text-muted">@user.Email</div></td>
+                <td>@string.Join(", ", user.Roles)</td>
+                <td>
+                    <form method="post" class="d-flex gap-2">
+                        <input type="hidden" name="userId" value="@user.Id" />
+                        <select class="form-select" name="role">
+                            @foreach (var role in Model.RoleNames)
+                            {
+                                <option>@role</option>
+                            }
+                        </select>
+                        <button class="btn btn-primary" type="submit" asp-page-handler="Assign">Assign</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

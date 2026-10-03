@@ -1,0 +1,38 @@
+@page
+@model VoucherMgt.Web.Pages.Budgets.DetailsModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Budget";
+    ViewData["Icon"] = "bi-pie-chart";
+    var period = Model.Period!;
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>@period.Name</h1>
+            <p>@period.StartsOn.ToString("dd MMM yyyy") – @period.EndsOn.ToString("dd MMM yyyy"). @period.Notes</p>
+        </div>
+    </div>
+    <p class="fw-bold">Total provision @Money.Format(period.Lines.Sum(l => l.Amount), Money.Ugx)</p>
+    @foreach (var group in Model.Groups)
+    {
+        <h2 class="h6 mt-4">@group.Key</h2>
+        <table class="table">
+            <thead><tr><th>#</th><th>Description</th><th class="text-end">Budget</th><th class="text-end">Committed</th></tr></thead>
+            <tbody>
+            @foreach (var line in group)
+            {
+                var used = Model.Committed.GetValueOrDefault(line.Id);
+                <tr>
+                    <td>@line.LineNumber</td>
+                    <td>@line.Description</td>
+                    <td class="text-end">@Money.Format(line.Amount, line.Currency)</td>
+                    <td class="text-end">@Money.Format(used, line.Currency)</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot><tr><th colspan="2" class="text-end">Subtotal</th><th class="text-end">@Money.Format(group.Sum(l => l.Amount), Money.Ugx)</th><th class="text-end">@Money.Format(group.Sum(l => Model.Committed.GetValueOrDefault(l.Id)), Money.Ugx)</th></tr></tfoot>
+        </table>
+    }
+</div>

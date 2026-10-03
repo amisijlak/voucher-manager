@@ -1,0 +1,25 @@
+@page
+@model VoucherMgt.Web.Pages.License.ExpiredModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>License expired</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <main class="min-vh-100 d-flex align-items-center justify-content-center p-4">
+        <div class="card" style="max-width:480px;">
+            <div class="card-body p-4">
+                <h1 class="h4">License inactive</h1>
+                <p>The organization <strong>@Model.OrganizationCode</strong> does not have a valid license, so voucher processing is paused.</p>
+                <a class="btn btn-primary" asp-page="/Account/Login">Sign in</a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

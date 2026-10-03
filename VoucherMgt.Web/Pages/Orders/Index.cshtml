@@ -1,0 +1,43 @@
+@page
+@model VoucherMgt.Web.Pages.Orders.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Order forms";
+    ViewData["Icon"] = "bi-file-earmark-ruled";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>LPO / order forms</h1>
+            <p>Client orders and purchase orders for Status Luxury, Price Locker, and Status One, including advertising time orders.</p>
+        </div>
+        <a class="btn btn-primary" asp-page="Edit">New order</a>
+    </div>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-6"><input class="form-control" name="q" value="@Model.Q" placeholder="Search number or party" /></div>
+        <div class="col-md-2"><button class="btn btn-outline-primary" type="submit">Search</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>Number</th><th>Type</th><th>Company</th><th>Party</th><th>Gross</th><th>Status</th></tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="6" class="text-muted">No order forms yet.</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><a asp-page="Details" asp-route-id="@item.Id">@item.Number</a></td>
+                    <td>@(item.Direction == OrderDirection.Purchase ? "LPO" : "Client order") · @item.Kind</td>
+                    <td>@item.TradingCompany?.ShortName</td>
+                    <td>@item.PartyName</td>
+                    <td>@Money.FormatPair(item.GrossUgx, item.GrossUsd)</td>
+                    <td><span class="badge @StatusText.Badge(item.Status)">@item.Status</span></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

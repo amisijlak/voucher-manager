@@ -1,0 +1,37 @@
+@page
+@model VoucherMgt.Web.Pages.Approvals.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Approvals";
+    ViewData["Icon"] = "bi-check2-square";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>Petty cash approval</h1>
+            <p>Submitted requisitions waiting for a decision. Open one to approve the full amount, reduce it, return it, or reject it.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>Number</th><th>Requester</th><th>Title</th><th>Amount</th><th></th></tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="5" class="text-muted">Nothing is waiting for approval.</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td>@item.Number</td>
+                    <td>@item.RequestedByName</td>
+                    <td>@item.Title</td>
+                    <td>@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</td>
+                    <td><a class="btn btn-sm btn-primary" asp-page="/Requisitions/Details" asp-route-id="@item.Id">Review</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

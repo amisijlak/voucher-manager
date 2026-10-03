@@ -1,0 +1,71 @@
+@page
+@model VoucherMgt.Web.Pages.Orders.DetailsModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = Model.Item!.Number;
+    ViewData["Icon"] = "bi-file-earmark-ruled";
+    var item = Model.Item;
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>@item.Number <span class="badge @StatusText.Badge(item.Status)">@item.Status</span></h1>
+            <p>@item.TradingCompany.Name · @item.PartyName · @(item.Direction == OrderDirection.Purchase ? "Purchase order" : "Client order")</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-primary" asp-page="Print" asp-route-id="@item.Id" target="_blank">Print</a>
+            @if (item.Status == OrderStatus.Draft)
+            {
+                <a class="btn btn-outline-primary" asp-page="Edit" asp-route-id="@item.Id">Edit</a>
+            }
+            @if (item.Status is OrderStatus.Issued or OrderStatus.PartiallyInvoiced or OrderStatus.Invoiced)
+            {
+                <a class="btn btn-primary" asp-page="/Invoices/Edit" asp-route-orderId="@item.Id">Raise invoice</a>
+            }
+        </div>
+    </div>
+    <p class="mb-1">Net @Money.FormatPair(item.NetUgx, item.NetUsd)</p>
+    <p class="mb-1">VAT @item.VatRate.ToString("0.##")% (@item.VatMode) @Money.FormatPair(item.VatUgx, item.VatUsd)</p>
+    <p class="fw-bold">Gross @Money.FormatPair(item.GrossUgx, item.GrossUsd)</p>
+    <div class="table-responsive">
+        <table class="table">
+            <thead><tr><th>Description</th><th>Qty</th><th class="text-end">Unit</th><th class="text-end">Amount</th></tr></thead>
+            <tbody>
+            @foreach (var line in item.Lines.OrderBy(l => l.LineNumber))
+            {
+                <tr>
+                    <td>
+                        @line.Description
+                        @if (item.Kind == OrderKind.Advertising)
+                        {
+                            <div class="small text-muted">@line.Programme @line.LengthSeconds s · @line.Insertions insertions</div>
+                        }
+                    </td>
+                    <td>@line.Quantity.ToString("0.##")</td>
+                    <td class="text-end">@Money.Format(line.UnitPrice, line.Currency)</td>
+                    <td class="text-end">@Money.Format(line.Amount, line.Currency)</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (item.Invoices.Count > 0)
+    {
+        <h2 class="h6">Invoices</h2>
+        <ul>
+            @foreach (var invoice in item.Invoices)
+            {
+                <li><a asp-page="/Invoices/Details" asp-route-id="@invoice.Id">@invoice.Number</a> · @invoice.Status · @Money.FormatPair(invoice.GrossUgx, invoice.GrossUsd)</li>
+            }
+        </ul>
+    }
+    @if (Model.CanIssue && item.Status == OrderStatus.Draft)
+    {
+        <form method="post" asp-page-handler="Issue" class="d-inline"><button class="btn btn-primary" type="submit">Issue order</button></form>
+    }
+    @if (Model.CanIssue && item.Status is not (OrderStatus.Cancelled or OrderStatus.Closed))
+    {
+        <form method="post" asp-page-handler="Cancel" class="d-inline ms-2"><button class="btn btn-outline-primary" type="submit">Cancel order</button></form>
+    }
+</div>

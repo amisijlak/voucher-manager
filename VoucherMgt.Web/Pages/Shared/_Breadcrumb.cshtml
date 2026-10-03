@@ -1,0 +1,15 @@
+@{
+    var title = ViewData["Title"]?.ToString() ?? "Dashboard";
+    var icon = ViewData["Icon"]?.ToString() ?? "bi-house-door";
+}
+<div class="breadcrumb-panel">
+    <div class="bc-title">
+        <i class="bi @icon"></i>
+        <span>@title</span>
+    </div>
+    <div class="text-muted">
+        <a asp-page="/Index">Home</a>
+        <span class="mx-2">/</span>
+        <span class="fw-semibold">@title</span>
+    </div>
+</div>

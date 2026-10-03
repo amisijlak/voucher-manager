@@ -1,0 +1,88 @@
+@page "{requisitionId:int}"
+@model VoucherMgt.Web.Pages.Accountability.EditModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Accountability";
+    ViewData["Icon"] = "bi-receipt";
+    var item = Model.Item!;
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>Account for @item.Number</h1>
+            <p>Issued @Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0). List each receipt. The difference is shown to the reviewer.</p>
+        </div>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+        <div class="table-responsive">
+            <table class="table" id="receiptTable">
+                <thead><tr><th>Date</th><th>How it was used</th><th>Receipt no.</th><th>Amount</th><th>Currency</th><th>File</th><th></th></tr></thead>
+                <tbody>
+                @for (var i = 0; i < Model.Input.Lines.Count; i++)
+                {
+                    var line = Model.Input.Lines[i];
+                    <tr>
+                        <td><input class="form-control" type="date" name="Input.Lines[@i].SpentOn" value="@line.SpentOn.ToString("yyyy-MM-dd")" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].Description" value="@line.Description" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].ReceiptNumber" value="@line.ReceiptNumber" /></td>
+                        <td><input class="form-control" type="number" min="0" step="0.01" name="Input.Lines[@i].Amount" value="@line.Amount" /></td>
+                        <td>
+                            <select class="form-select" name="Input.Lines[@i].Currency">
+                                <option value="UGX" selected="@(line.Currency != Money.Usd ? "selected" : null)">UGX</option>
+                                <option value="USD" selected="@(line.Currency == Money.Usd ? "selected" : null)">USD</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="hidden" name="Input.Lines[@i].ExistingPath" value="@line.ExistingPath" />
+                            <input type="hidden" name="Input.Lines[@i].ExistingName" value="@line.ExistingName" />
+                            @if (!string.IsNullOrWhiteSpace(line.ExistingName))
+                            {
+                                <div class="small text-muted mb-1">@line.ExistingName</div>
+                            }
+                            <input class="form-control" type="file" name="Input.Lines[@i].File" accept=".pdf,.jpg,.jpeg,.png,.webp" />
+                        </td>
+                        <td><button class="btn btn-sm btn-outline-primary" type="button" onclick="removeReceipt(this)">Remove</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-outline-primary" type="button" onclick="addReceipt()">Add receipt</button>
+        <div class="mt-3">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" asp-for="Input.Notes" rows="2"></textarea>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-outline-primary" type="submit" asp-page-handler="Save">Save</button>
+            <button class="btn btn-primary" type="submit" asp-page-handler="Submit">Submit accountability</button>
+        </div>
+    </form>
+</div>
+<template id="receiptTemplate">
+    <tr>
+        <td><input class="form-control" type="date" name="Input.Lines[__i__].SpentOn" value="@DateTime.Today.ToString("yyyy-MM-dd")" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].Description" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].ReceiptNumber" /></td>
+        <td><input class="form-control" type="number" min="0" step="0.01" name="Input.Lines[__i__].Amount" /></td>
+        <td><select class="form-select" name="Input.Lines[__i__].Currency"><option value="UGX">UGX</option><option value="USD">USD</option></select></td>
+        <td><input class="form-control" type="file" name="Input.Lines[__i__].File" accept=".pdf,.jpg,.jpeg,.png,.webp" /></td>
+        <td><button class="btn btn-sm btn-outline-primary" type="button" onclick="removeReceipt(this)">Remove</button></td>
+    </tr>
+</template>
+@section Scripts {
+<script>
+    function addReceipt() {
+        const body = document.querySelector('#receiptTable tbody');
+        body.insertAdjacentHTML('beforeend', document.getElementById('receiptTemplate').innerHTML.replaceAll('__i__', body.rows.length));
+    }
+    function removeReceipt(button) {
+        const body = document.querySelector('#receiptTable tbody');
+        if (body.rows.length === 1) return;
+        button.closest('tr').remove();
+        [...body.rows].forEach((row, index) => {
+            row.querySelectorAll('[name]').forEach(input => input.name = input.name.replace(/Lines\[\d+\]/, 'Lines[' + index + ']'));
+        });
+    }
+</script>
+}

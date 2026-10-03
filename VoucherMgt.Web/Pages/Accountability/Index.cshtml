@@ -1,0 +1,42 @@
+@page
+@model VoucherMgt.Web.Pages.Accountability.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Accountability";
+    ViewData["Icon"] = "bi-receipt";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>Petty cash accountability</h1>
+            <p>After cash is issued, the holder lists how it was used and attaches the receipts.</p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>Number</th><th>Title</th><th>Issued</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="5" class="text-muted">No requisition is waiting for accountability.</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><a asp-page="/Requisitions/Details" asp-route-id="@item.Id">@item.Number</a></td>
+                    <td>@item.Title</td>
+                    <td>@Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0)</td>
+                    <td><span class="badge @StatusText.Badge(item.Status)">@StatusText.Label(item.Status)</span></td>
+                    <td>
+                        @if (item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned)
+                        {
+                            <a class="btn btn-sm btn-primary" asp-page="Edit" asp-route-requisitionId="@item.Id">Enter receipts</a>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,31 @@
+@page
+@model VoucherMgt.Web.Pages.Reports.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Reports";
+    ViewData["Icon"] = "bi-bar-chart";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading"><div><h1>Reports</h1><p>Cash requested, approved, issued, and still to account, plus open orders and invoices.</p></div></div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(Model.RequestedUgx, Model.RequestedUsd)</h3><p>Requested</p></div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(Model.ApprovedUgx, Model.ApprovedUsd)</h3><p>Approved</p></div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(Model.IssuedUgx, Model.IssuedUsd)</h3><p>Issued</p></div></div></div>
+        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(Model.UnpaidUgx, Model.UnpaidUsd)</h3><p>Unpaid invoices</p></div></div></div>
+    </div>
+    <table class="table">
+        <thead><tr><th>Requisition status</th><th class="text-end">Count</th><th class="text-end">UGX</th><th class="text-end">USD</th></tr></thead>
+        <tbody>
+        @foreach (var row in Model.ByStatus)
+        {
+            <tr>
+                <td>@StatusText.Label(row.Status)</td>
+                <td class="text-end">@row.Count</td>
+                <td class="text-end">@row.Ugx.ToString("#,##0")</td>
+                <td class="text-end">@row.Usd.ToString("#,##0.00")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

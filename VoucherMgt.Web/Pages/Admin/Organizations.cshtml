@@ -1,0 +1,71 @@
+@page
+@model VoucherMgt.Web.Pages.Admin.OrganizationsModel
+@{
+    ViewData["Title"] = "Organizations";
+    ViewData["Icon"] = "bi-buildings";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading"><div><h1>Organizations</h1><p>Each organization has its own license, users, and voucher books.</p></div></div>
+    <table class="table">
+        <thead><tr><th>Code</th><th>Name</th><th>License</th></tr></thead>
+        <tbody>
+        @foreach (var organization in Model.Organizations)
+        {
+            var license = organization.Licenses.OrderByDescending(l => l.ExpiresOn).FirstOrDefault();
+            <tr>
+                <td>@organization.Code</td>
+                <td>@organization.Name</td>
+                <td>@(license is null ? "None" : license.ExpiresOn.ToString("dd MMM yyyy"))</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <h2 class="h6">New organization</h2>
+            <form method="post" asp-page-handler="CreateOrganization" class="vstack gap-2">
+                <input class="form-control" asp-for="OrganizationCode" placeholder="Code" />
+                <input class="form-control" asp-for="OrganizationName" placeholder="Name" />
+                <input class="form-control" asp-for="OrganizationEmail" placeholder="Email" />
+                <input class="form-control" asp-for="OrganizationPhone" placeholder="Phone" />
+                <button class="btn btn-primary" type="submit">Create</button>
+            </form>
+        </div>
+        <div class="col-lg-4">
+            <h2 class="h6">Renew license</h2>
+            <form method="post" asp-page-handler="AddLicense" class="vstack gap-2">
+                <select class="form-select" asp-for="LicenseOrganizationId">
+                    @foreach (var organization in Model.Organizations)
+                    {
+                        <option value="@organization.Id">@organization.Name</option>
+                    }
+                </select>
+                <input class="form-control" asp-for="LicenseExpiresOn" type="date" />
+                <button class="btn btn-primary" type="submit">Add license</button>
+            </form>
+        </div>
+        <div class="col-lg-4">
+            <h2 class="h6">New user</h2>
+            <form method="post" asp-page-handler="CreateUser" class="vstack gap-2">
+                <select class="form-select" asp-for="UserOrganizationId">
+                    @foreach (var organization in Model.Organizations)
+                    {
+                        <option value="@organization.Id">@organization.Name</option>
+                    }
+                </select>
+                <input class="form-control" asp-for="UserFullName" placeholder="Full name" />
+                <input class="form-control" asp-for="UserEmail" placeholder="Email" />
+                <input class="form-control" asp-for="UserPassword" placeholder="Password" />
+                <select class="form-select" asp-for="UserRole">
+                    <option>Requester</option>
+                    <option>Approver</option>
+                    <option>Accountant</option>
+                    <option>Procurement</option>
+                    <option>Admin</option>
+                </select>
+                <button class="btn btn-primary" type="submit">Create user</button>
+            </form>
+        </div>
+    </div>
+</div>

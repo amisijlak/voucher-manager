@@ -1,0 +1,165 @@
+@page
+@model VoucherMgt.Web.Pages.Requisitions.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Requisitions";
+    ViewData["Icon"] = "bi-cash-stack";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>Petty cash requisitions</h1>
+            <p>Each request gets a tracking number and a total made up of its items.</p>
+        </div>
+        @if (Model.CanCreate)
+        {
+            <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#newRequisitionModal">
+                <i class="bi bi-plus-lg me-1"></i>New requisition
+            </button>
+        }
+    </div>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-5"><input class="form-control" name="q" value="@Model.Q" placeholder="Search tracking number, title, requester" /></div>
+        <div class="col-md-3">
+            <select class="form-select" name="status">
+                <option value="">All statuses</option>
+                @foreach (var status in Enum.GetValues<RequisitionStatus>())
+                {
+                    <option value="@status" selected="@(Model.Status == status.ToString() ? "selected" : null)">@StatusText.Label(status)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Filter</button></div>
+    </form>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover" id="requisitionTable">
+            <thead><tr><th>Tracking number</th><th>Period</th><th>Title</th><th class="text-end">Requested</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="6" class="text-muted">No requisitions match this filter.</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><a class="tracking-number" asp-page="Details" asp-route-id="@item.Id">@item.Number</a></td>
+                    <td>@item.PeriodStart.ToString("dd MMM") – @item.PeriodEnd.ToString("dd MMM yyyy")</td>
+                    <td><a asp-page="Details" asp-route-id="@item.Id">@item.Title</a></td>
+                    <td class="num">@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</td>
+                    <td><span class="badge @StatusText.Badge(item.Status)">@StatusText.Label(item.Status)</span></td>
+                    <td class="text-end"><a class="btn btn-sm btn-view" asp-page="Details" asp-route-id="@item.Id">View</a></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (Model.CanCreate)
+{
+    <div class="modal fade" id="newRequisitionModal" tabindex="-1" aria-labelledby="newRequisitionTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <form method="post" asp-page-handler="Create">
+                    <div class="modal-header">
+                        <div>
+                            <h2 class="modal-title h5 mb-1" id="newRequisitionTitle">New requisition</h2>
+                            <div class="text-muted small">Tracking number <strong class="tracking-number">@Model.NextNumber</strong> is assigned when you save.</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Title</label>
+                                <input class="form-control" asp-for="Input.Title" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Department</label>
+                                <input class="form-control" asp-for="Input.Department" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Period start</label>
+                                <input class="form-control" asp-for="Input.PeriodStart" id="periodStart" type="date" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Period end</label>
+                                <input class="form-control" asp-for="Input.PeriodEnd" id="periodEnd" type="date" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Budget period</label>
+                                <select class="form-select" asp-for="Input.BudgetPeriodId" id="budgetPeriod">
+                                    <option value="">Not linked</option>
+                                    @foreach (var period in Model.Periods)
+                                    {
+                                        <option value="@period.Id">@period.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Purpose</label>
+                                <textarea class="form-control" asp-for="Input.Purpose" rows="2"></textarea>
+                            </div>
+                        </div>
+                        <p class="text-muted small mt-3 mb-2">Choose a budget period to load its lines. Leave it blank to type each item yourself.</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="lineTable">
+                                <thead>
+                                    <tr>
+                                        <th class="text-end" style="width:48px">#</th>
+                                        <th>Item</th>
+                                        <th class="text-end" style="width:110px">Qty</th>
+                                        <th class="text-end" style="width:160px">Unit amount</th>
+                                        <th style="width:110px">Currency</th>
+                                        <th style="width:56px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                @for (var i = 0; i < Model.Input.Lines.Count; i++)
+                                {
+                                    <tr>
+                                        <td class="line-no">@(i + 1)</td>
+                                        <td><input class="form-control" name="Input.Lines[@i].Description" value="@Model.Input.Lines[i].Description" /></td>
+                                        <td><input class="form-control text-end" name="Input.Lines[@i].Quantity" value="@Model.Input.Lines[i].Quantity" type="number" min="0" step="0.01" /></td>
+                                        <td><input class="form-control text-end amount-input" name="Input.Lines[@i].UnitAmount" value="@Money.FormatNumber(Model.Input.Lines[i].UnitAmount, Model.Input.Lines[i].Currency)" inputmode="decimal" /></td>
+                                        <td>
+                                            <select class="form-select" name="Input.Lines[@i].Currency">
+                                                <option value="UGX" selected="@(Model.Input.Lines[i].Currency != Money.Usd ? "selected" : null)">UGX</option>
+                                                <option value="USD" selected="@(Model.Input.Lines[i].Currency == Money.Usd ? "selected" : null)">USD</option>
+                                            </select>
+                                        </td>
+                                        <td class="text-end">
+                                            <input type="hidden" name="Input.Lines[@i].BudgetLineId" value="@Model.Input.Lines[i].BudgetLineId" />
+                                            <button class="btn btn-danger btn-sm" type="button" onclick="removeRequisitionLine(this)" title="Remove item"><i class="bi bi-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                }
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-outline-primary" type="button" onclick="addRequisitionLine()">Add item</button>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cancel</button>
+                        <button class="btn btn-primary" type="submit">Save requisition</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+    window.requisitionBudgetCatalog = {
+        periods: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Periods.Select(p => new { id = p.Id, start = p.StartsOn.ToString("yyyy-MM-dd"), end = p.EndsOn.ToString("yyyy-MM-dd") }), new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Default })),
+        lines: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BudgetLines.OrderBy(l => l.LineNumber).Select(l => new { id = l.Id, periodId = l.BudgetPeriodId, description = l.Description, amount = l.Amount, currency = l.Currency }), new System.Text.Json.JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Default }))
+    };
+    initRequisitionItems();
+    @if (Model.ShowDialog)
+    {
+        <text>new bootstrap.Modal(document.getElementById('newRequisitionModal')).show();</text>
+    }
+</script>
+}

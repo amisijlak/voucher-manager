@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="VoucherMgt.BLL/VoucherMgt.BLL.csproj" />
+  <Project Path="VoucherMgt.Common/VoucherMgt.Common.csproj" />
+  <Project Path="VoucherMgt.DAL/VoucherMgt.DAL.csproj" />
+  <Project Path="VoucherMgt.Web/VoucherMgt.Web.csproj" />
+</Solution>

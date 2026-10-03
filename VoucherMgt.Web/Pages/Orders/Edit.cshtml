@@ -1,0 +1,136 @@
+@page
+@model VoucherMgt.Web.Pages.Orders.EditModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = Model.Input.Id is null ? "New order form" : "Edit order form";
+    ViewData["Icon"] = "bi-file-earmark-ruled";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading"><div><h1>@ViewData["Title"]</h1><p>Matches the paper order: company, client particulars, line items, VAT, and signatures.</p></div></div>
+    <form method="post">
+        <input type="hidden" asp-for="Input.Id" />
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Direction</label>
+                <select class="form-select" asp-for="Input.Direction">
+                    <option value="@OrderDirection.ClientOrder">Client order</option>
+                    <option value="@OrderDirection.Purchase">LPO / purchase</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Kind</label>
+                <select class="form-select" asp-for="Input.Kind">
+                    <option value="@OrderKind.General">General</option>
+                    <option value="@OrderKind.Advertising">Advertising time</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Company</label>
+                <select class="form-select" asp-for="Input.TradingCompanyId">
+                    <option value="">Select</option>
+                    @foreach (var company in Model.Companies)
+                    {
+                        <option value="@company.Id">@company.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6"><label class="form-label">Client / supplier name</label><input class="form-control" asp-for="Input.PartyName" /></div>
+            <div class="col-md-3"><label class="form-label">Contact name</label><input class="form-control" asp-for="Input.ContactName" /></div>
+            <div class="col-md-3"><label class="form-label">Invoice name</label><input class="form-control" asp-for="Input.InvoiceName" /></div>
+            <div class="col-md-6"><label class="form-label">Address</label><input class="form-control" asp-for="Input.Address" /></div>
+            <div class="col-md-3"><label class="form-label">City / town</label><input class="form-control" asp-for="Input.CityTown" /></div>
+            <div class="col-md-3"><label class="form-label">Country</label><input class="form-control" asp-for="Input.Country" /></div>
+            <div class="col-md-3"><label class="form-label">Phone</label><input class="form-control" asp-for="Input.Phone" /></div>
+            <div class="col-md-3"><label class="form-label">Fax</label><input class="form-control" asp-for="Input.Fax" /></div>
+            <div class="col-md-6"><label class="form-label">Email</label><input class="form-control" asp-for="Input.Email" /></div>
+            <div class="col-md-4"><label class="form-label">Station / channel</label><input class="form-control" asp-for="Input.Channel" placeholder="For advertising orders" /></div>
+            <div class="col-md-4">
+                <label class="form-label">Linked requisition</label>
+                <select class="form-select" asp-for="Input.RequisitionId">
+                    <option value="">None</option>
+                    @foreach (var requisition in Model.Requisitions)
+                    {
+                        <option value="@requisition.Id">@requisition.Number — @requisition.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">VAT</label>
+                <select class="form-select" asp-for="Input.VatMode">
+                    <option value="@VatMode.Exclusive">Exclusive</option>
+                    <option value="@VatMode.Inclusive">Inclusive</option>
+                    <option value="@VatMode.Exempt">Exempt</option>
+                </select>
+            </div>
+            <div class="col-md-2"><label class="form-label">VAT %</label><input class="form-control" asp-for="Input.VatRate" type="number" step="0.01" /></div>
+        </div>
+        <div class="table-responsive mt-4">
+            <table class="table" id="orderLines">
+                <thead><tr><th>Description</th><th>Programme</th><th>Sec</th><th>Insertions</th><th>Qty</th><th>Unit price</th><th>Currency</th><th></th></tr></thead>
+                <tbody>
+                @for (var i = 0; i < Model.Input.Lines.Count; i++)
+                {
+                    var line = Model.Input.Lines[i];
+                    <tr>
+                        <td><input class="form-control" name="Input.Lines[@i].Description" value="@line.Description" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].Programme" value="@line.Programme" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].LengthSeconds" value="@line.LengthSeconds" type="number" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].Insertions" value="@line.Insertions" type="number" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].Quantity" value="@line.Quantity" type="number" step="0.01" /></td>
+                        <td><input class="form-control" name="Input.Lines[@i].UnitAmount" value="@line.UnitAmount" type="number" step="0.01" /></td>
+                        <td>
+                            <select class="form-select" name="Input.Lines[@i].Currency">
+                                <option value="UGX" selected="@(line.Currency != Money.Usd ? "selected" : null)">UGX</option>
+                                <option value="USD" selected="@(line.Currency == Money.Usd ? "selected" : null)">USD</option>
+                            </select>
+                        </td>
+                        <td><button type="button" class="btn btn-sm btn-outline-primary" onclick="removeOrderLine(this)">Remove</button></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <button class="btn btn-outline-primary" type="button" onclick="addOrderLine()">Add line</button>
+        <div class="row g-3 mt-2">
+            <div class="col-md-8"><label class="form-label">Payment note</label><input class="form-control" asp-for="Input.PaymentNote" /></div>
+            <div class="col-md-4"><label class="form-label">Account number</label><input class="form-control" asp-for="Input.AccountNumber" /></div>
+            <div class="col-md-4"><label class="form-label">Client signatory</label><input class="form-control" asp-for="Input.ClientSignatoryName" /></div>
+            <div class="col-md-4"><label class="form-label">Designation</label><input class="form-control" asp-for="Input.ClientDesignation" /></div>
+            <div class="col-md-4"><label class="form-label">Signed on</label><input class="form-control" asp-for="Input.ClientSignedOn" type="date" /></div>
+            <div class="col-md-4"><label class="form-label">Business manager</label><input class="form-control" asp-for="Input.BusinessManager" /></div>
+            <div class="col-md-4"><label class="form-label">Business supervisor</label><input class="form-control" asp-for="Input.BusinessSupervisor" /></div>
+            <div class="col-md-4"><label class="form-label">Credit control</label><input class="form-control" asp-for="Input.CreditControl" /></div>
+        </div>
+        <div class="mt-4 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Save order</button>
+            <a class="btn btn-outline-primary" asp-page="Index">Cancel</a>
+        </div>
+    </form>
+</div>
+<template id="orderLineTemplate">
+    <tr>
+        <td><input class="form-control" name="Input.Lines[__i__].Description" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].Programme" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].LengthSeconds" type="number" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].Insertions" type="number" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].Quantity" value="1" type="number" step="0.01" /></td>
+        <td><input class="form-control" name="Input.Lines[__i__].UnitAmount" type="number" step="0.01" /></td>
+        <td><select class="form-select" name="Input.Lines[__i__].Currency"><option value="UGX">UGX</option><option value="USD">USD</option></select></td>
+        <td><button type="button" class="btn btn-sm btn-outline-primary" onclick="removeOrderLine(this)">Remove</button></td>
+    </tr>
+</template>
+@section Scripts {
+<script>
+    function addOrderLine() {
+        const body = document.querySelector('#orderLines tbody');
+        body.insertAdjacentHTML('beforeend', document.getElementById('orderLineTemplate').innerHTML.replaceAll('__i__', body.rows.length));
+    }
+    function removeOrderLine(button) {
+        const body = document.querySelector('#orderLines tbody');
+        if (body.rows.length === 1) return;
+        button.closest('tr').remove();
+        [...body.rows].forEach((row, index) => row.querySelectorAll('[name]').forEach(input => input.name = input.name.replace(/Lines\[\d+\]/, 'Lines[' + index + ']')));
+    }
+</script>
+}

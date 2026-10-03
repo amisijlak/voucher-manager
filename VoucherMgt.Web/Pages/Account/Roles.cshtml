@@ -1,0 +1,42 @@
+@page
+@model VoucherMgt.Web.Pages.Account.RolesModel
+@{
+    ViewData["Title"] = "Roles";
+    ViewData["Icon"] = "bi-shield-check";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <h1 class="h5">Roles</h1>
+            <div class="list-group">
+                @foreach (var role in Model.Roles)
+                {
+                    <a class="list-group-item @(role.IsSelected ? "active" : "")" asp-page="Roles" asp-route-id="@role.Id">
+                        @role.Name <span class="badge bg-secondary">@role.PermissionCount</span>
+                    </a>
+                }
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <h2 class="h5">@(string.IsNullOrWhiteSpace(Model.Input.Id) ? "New role" : "Edit role")</h2>
+            <form method="post" asp-page-handler="Save">
+                <input type="hidden" asp-for="Input.Id" />
+                <label class="form-label">Name</label>
+                <input class="form-control mb-3" asp-for="Input.Name" />
+                @foreach (var group in Model.PermissionGroups)
+                {
+                    <h3 class="h6 mt-3">@group.Key</h3>
+                    @foreach (var permission in group)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="Input.SelectedPermissions" value="@permission.Value" id="@permission.Value" checked="@(Model.Input.SelectedPermissions.Contains(permission.Value) ? "checked" : null)" />
+                            <label class="form-check-label" for="@permission.Value">@permission.DisplayName</label>
+                        </div>
+                    }
+                }
+                <button class="btn btn-primary mt-3" type="submit">Save role</button>
+            </form>
+        </div>
+    </div>
+</div>

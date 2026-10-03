@@ -1,0 +1,120 @@
+﻿<!DOCTYPE html>
+@using System.Security.Claims
+@using VoucherMgt.BLL.Core
+@inject ICurrentOrganizationContext OrganizationContext
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Voucher Management</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/VoucherMgt.Web.styles.css" asp-append-version="true" />
+</head>
+<body id="page-top">
+@{
+    var currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? "";
+    var displayName = User.FindFirstValue("FullName") ?? User.Identity?.Name ?? "Signed in";
+}
+<div id="wrapper">
+    <aside class="sidebar" id="sidebar">
+        <a class="sidebar-brand" asp-page="/Index">
+            <div class="brand-mark">SO</div>
+            <div class="sidebar-brand-text">
+                <strong>Status One</strong>
+                <span>Voucher Management</span>
+            </div>
+        </a>
+        <hr class="sidebar-divider" />
+        <div class="sidebar-heading">Main</div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link @(currentPage == "/Index" ? "active" : "")" asp-page="/Index"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+        </nav>
+        <hr class="sidebar-divider" />
+        <div class="sidebar-heading">Petty cash</div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link @(currentPage.StartsWith("/Requisitions") ? "active" : "")" asp-page="/Requisitions/Index"><i class="bi bi-cash-stack"></i><span>Requisitions</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Approvals") ? "active" : "")" asp-page="/Approvals/Index"><i class="bi bi-check2-square"></i><span>Approvals</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Accountability") ? "active" : "")" asp-page="/Accountability/Index"><i class="bi bi-receipt"></i><span>Accountability</span></a>
+        </nav>
+        <hr class="sidebar-divider" />
+        <div class="sidebar-heading">Procurement</div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link @(currentPage.StartsWith("/Orders") ? "active" : "")" asp-page="/Orders/Index"><i class="bi bi-file-earmark-ruled"></i><span>LPO / Orders</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Invoices") ? "active" : "")" asp-page="/Invoices/Index"><i class="bi bi-receipt-cutoff"></i><span>Invoices</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Budgets") ? "active" : "")" asp-page="/Budgets/Index"><i class="bi bi-pie-chart"></i><span>Budgets</span></a>
+        </nav>
+        <hr class="sidebar-divider" />
+        <div class="sidebar-heading">Administration</div>
+        <nav class="sidebar-nav">
+            <a class="sidebar-link @(currentPage.StartsWith("/Reports") ? "active" : "")" asp-page="/Reports/Index"><i class="bi bi-bar-chart"></i><span>Reports</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Admin") ? "active" : "")" asp-page="/Admin/Organizations"><i class="bi bi-buildings"></i><span>Organizations</span></a>
+            <a class="sidebar-link @(currentPage.Contains("/Account/Roles") ? "active" : "")" asp-page="/Account/Roles"><i class="bi bi-shield-check"></i><span>Roles</span></a>
+            <a class="sidebar-link @(currentPage.Contains("/Account/UserRoles") ? "active" : "")" asp-page="/Account/UserRoles"><i class="bi bi-people"></i><span>User roles</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Settings") ? "active" : "")" asp-page="/Settings/Index"><i class="bi bi-sliders"></i><span>Settings</span></a>
+        </nav>
+    </aside>
+    <div class="content-wrapper">
+        <nav class="topbar shadow-sm">
+            <button class="topbar-toggler" id="sidebarToggle" type="button"><i class="bi bi-list"></i></button>
+            <form class="topbar-search d-none d-sm-inline-block" method="get" action="/Requisitions">
+                <div class="input-group">
+                    <input class="form-control bg-light border-0 small" type="search" name="q" placeholder="Search requisition number or title">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+            </form>
+            <ul class="topbar-nav">
+                <li class="topbar-item d-none d-md-flex align-items-center me-2">
+                    <span class="badge bg-secondary"><i class="bi bi-buildings me-1"></i>@OrganizationContext.OrganizationCode</span>
+                </li>
+                <li class="topbar-item dropdown">
+                    <a class="topbar-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                        <span class="d-none d-lg-inline me-2 text-gray-600 small fw-bold">@displayName</span>
+                        <div class="topbar-avatar"><i class="bi bi-person-circle"></i></div>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><a class="dropdown-item" asp-page="/Index">Dashboard</a></li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <form method="post" asp-page="/Account/Logout">
+                                <button class="dropdown-item" type="submit">Sign out</button>
+                            </form>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+        <main class="page-container" role="main">
+            @if (TempData["Status"] is string status)
+            {
+                <div class="alert alert-success">@status</div>
+            }
+            @if (TempData["Error"] is string error)
+            {
+                <div class="alert alert-danger">@error</div>
+            }
+            @RenderBody()
+        </main>
+        <footer class="app-footer">
+            <div class="d-flex align-items-center justify-content-between small">
+                <span class="text-muted">&copy; @DateTime.Now.Year Status One Group</span>
+                <span class="text-muted">Voucher and order control</span>
+            </div>
+        </footer>
+    </div>
+</div>
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="~/js/site.js" asp-append-version="true"></script>
+<script>
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+        if (window.innerWidth < 768) sidebar.classList.toggle('show-mobile');
+        else sidebar.classList.toggle('toggled');
+    });
+</script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,40 @@
+@page
+@model VoucherMgt.Web.Pages.Invoices.IndexModel
+@using VoucherMgt.Common
+@{
+    ViewData["Title"] = "Invoices";
+    ViewData["Icon"] = "bi-receipt-cutoff";
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel">
+    <div class="page-heading">
+        <div>
+            <h1>Invoices</h1>
+            <p>Supplier bills against LPOs, and invoices raised to clients against order forms.</p>
+        </div>
+        <a class="btn btn-primary" asp-page="Edit">New invoice</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>Number</th><th>Direction</th><th>Party</th><th>Order</th><th>Gross</th><th>Paid</th><th>Status</th></tr></thead>
+            <tbody>
+            @if (Model.Items.Count == 0)
+            {
+                <tr><td colspan="7" class="text-muted">No invoices yet.</td></tr>
+            }
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td><a asp-page="Details" asp-route-id="@item.Id">@item.Number</a></td>
+                    <td>@item.Direction</td>
+                    <td>@item.PartyName</td>
+                    <td>@(item.OrderForm?.Number ?? item.ExternalNumber)</td>
+                    <td>@Money.FormatPair(item.GrossUgx, item.GrossUsd)</td>
+                    <td>@Money.FormatPair(item.PaidUgx, item.PaidUsd)</td>
+                    <td><span class="badge @StatusText.Badge(item.Status)">@item.Status</span></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
