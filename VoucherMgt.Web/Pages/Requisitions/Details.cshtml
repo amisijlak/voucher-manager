@@ -9,61 +9,96 @@
     var spentUsd = item.Accountability?.Lines.Where(l => l.Currency == Money.Usd).Sum(l => l.Amount) ?? 0;
 }
 <partial name="_Breadcrumb" />
-<div class="content-panel">
-    <div class="page-heading">
+<div class="content-panel req-sheet">
+    <div class="req-hero">
         <div>
-            <h1>@item.Number <span class="badge @StatusText.Badge(item.Status)">@StatusText.Label(item.Status)</span></h1>
-            <p>@item.Title · @item.PeriodStart.ToString("dd MMM yyyy") – @item.PeriodEnd.ToString("dd MMM yyyy") · Requested by @item.RequestedByName</p>
+            <div class="req-kicker"><i class="bi bi-cash-stack"></i> Petty cash requisition</div>
+            <h1 class="tracking-number">@item.Number</h1>
+            <p class="req-title">@item.Title</p>
+            <div class="req-chips">
+                <span><i class="bi bi-calendar3"></i> @item.PeriodStart.ToString("dd MMM yyyy") – @item.PeriodEnd.ToString("dd MMM yyyy")</span>
+                <span><i class="bi bi-person"></i> @item.RequestedByName</span>
+                @if (!string.IsNullOrWhiteSpace(item.Department))
+                {
+                    <span><i class="bi bi-building"></i> @item.Department</span>
+                }
+                @if (item.BudgetPeriod is not null)
+                {
+                    <a asp-page="/Budgets/Details" asp-route-id="@item.BudgetPeriodId"><i class="bi bi-pie-chart"></i> @item.BudgetPeriod.Name</a>
+                }
+            </div>
         </div>
-        <div class="d-flex gap-2 flex-wrap justify-content-end">
-            <a class="btn btn-pdf" asp-page-handler="Pdf" asp-route-id="@item.Id"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
-            <a class="btn btn-excel" asp-page-handler="Csv" asp-route-id="@item.Id"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a>
-            @if (item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
-            {
-                <a class="btn btn-outline-primary" asp-page="Edit" asp-route-id="@item.Id">Edit</a>
-            }
-            @if (item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned)
-            {
-                <a class="btn btn-primary" asp-page="/Accountability/Edit" asp-route-requisitionId="@item.Id">Record receipts</a>
-            }
+        <div class="req-hero-side">
+            <span class="req-status"><i class="bi bi-flag"></i> @StatusText.Label(item.Status)</span>
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+                <a class="btn btn-pdf" asp-page-handler="Pdf" asp-route-id="@item.Id"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+                <a class="btn btn-excel" asp-page-handler="Csv" asp-route-id="@item.Id"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a>
+                @if (item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
+                {
+                    <a class="btn btn-view" asp-page="Edit" asp-route-id="@item.Id"><i class="bi bi-pencil me-1"></i>Edit</a>
+                }
+                @if (item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned)
+                {
+                    <a class="btn btn-primary" asp-page="/Accountability/Edit" asp-route-requisitionId="@item.Id"><i class="bi bi-receipt me-1"></i>Record receipts</a>
+                }
+                @if (Model.CanDecide && item.Status == RequisitionStatus.Submitted)
+                {
+                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#decisionModal"><i class="bi bi-check2-square me-1"></i>Approval decision</button>
+                }
+            </div>
         </div>
     </div>
-
-    <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</h3><p>Requested</p></div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(item.ApprovedUgx, item.ApprovedUsd)</h3><p>Approved</p></div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0)</h3><p>Issued</p></div></div></div>
-        <div class="col-md-3"><div class="stat-card"><div class="stat-info"><h3 class="h5">@Money.FormatPair(spentUgx, spentUsd)</h3><p>Accounted</p></div></div></div>
-    </div>
+    <div class="req-body">
 
     @if (!string.IsNullOrWhiteSpace(item.Purpose))
     {
-        <p>@item.Purpose</p>
-    }
-    @if (item.BudgetPeriod is not null)
-    {
-        <p class="text-muted">Budget: <a asp-page="/Budgets/Details" asp-route-id="@item.BudgetPeriodId">@item.BudgetPeriod.Name</a></p>
+        <div class="req-purpose"><i class="bi bi-chat-left-text"></i><span>@item.Purpose</span></div>
     }
 
-    <div class="table-responsive">
-        <table class="table table-striped">
-            <thead><tr><th class="text-end">#</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Amount</th></tr></thead>
-            <tbody>
-            @foreach (var line in item.Lines.OrderBy(l => l.LineNumber))
-            {
-                <tr>
-                    <td class="num">@line.LineNumber</td>
-                    <td>@line.Description</td>
-                    <td class="num">@line.Quantity.ToString("#,##0.##")</td>
-                    <td class="num">@Money.Format(line.UnitAmount, line.Currency)</td>
-                    <td class="num">@Money.Format(line.Amount, line.Currency)</td>
-                </tr>
-            }
-            </tbody>
-            <tfoot>
-                <tr><th colspan="4" class="text-end">Total</th><th class="num">@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</th></tr>
-            </tfoot>
-        </table>
+    <div class="req-summary">
+        <div class="stat-card req-stat">
+            <span class="stat-icon amber"><i class="bi bi-wallet2"></i></span>
+            <div class="stat-info"><h3>@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</h3><p>Requested</p></div>
+        </div>
+        <div class="stat-card req-stat">
+            <span class="stat-icon green"><i class="bi bi-check2-circle"></i></span>
+            <div class="stat-info"><h3>@Money.FormatPair(item.ApprovedUgx, item.ApprovedUsd)</h3><p>Approved</p></div>
+        </div>
+        <div class="stat-card req-stat">
+            <span class="stat-icon rose"><i class="bi bi-cash-coin"></i></span>
+            <div class="stat-info"><h3>@Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0)</h3><p>Issued</p></div>
+        </div>
+        <div class="stat-card req-stat">
+            <span class="stat-icon blue"><i class="bi bi-receipt-cutoff"></i></span>
+            <div class="stat-info"><h3>@Money.FormatPair(spentUgx, spentUsd)</h3><p>Accounted</p></div>
+        </div>
+    </div>
+
+    <div class="req-section" id="reqItems">
+        <div class="req-section-title">
+            <span><i class="bi bi-list-ol"></i> Items</span>
+            <button class="btn btn-sm btn-view" type="button" id="maximizeItems" title="View full page" onclick="toggleRequisitionTable()"><i class="bi bi-arrows-fullscreen"></i></button>
+        </div>
+        <div class="req-lines-scroll">
+            <table class="table req-lines mb-0">
+                <thead><tr><th class="text-end">#</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>
+                @foreach (var line in item.Lines.OrderBy(l => l.LineNumber))
+                {
+                    <tr>
+                        <td class="num"><span class="req-line-no">@line.LineNumber</span></td>
+                        <td>@line.Description</td>
+                        <td class="num">@line.Quantity.ToString("#,##0.##")</td>
+                        <td class="num">@Money.Format(line.UnitAmount, line.Currency)</td>
+                        <td class="num req-amount">@Money.Format(line.Amount, line.Currency)</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="4" class="text-end">Total</th><th class="num">@Money.FormatPair(item.RequestedUgx, item.RequestedUsd)</th></tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 
     @if (Model.CanSubmit && item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
@@ -75,63 +110,85 @@
 
     @if (item.Decisions.Count > 0)
     {
-        <h2 class="h6 mt-4">Approval history</h2>
-        <ul class="list-group mb-4">
+        <div class="req-section">
+        <div class="req-section-title"><i class="bi bi-clock-history"></i> Approval history</div>
+        <ul class="req-timeline">
             @foreach (var decision in item.Decisions.OrderByDescending(d => d.CreatedOn))
             {
-                <li class="list-group-item">
-                    <strong>@decision.Action</strong> by @decision.DecidedByName
-                    @if (decision.Action == ApprovalAction.Approve)
-                    {
-                        <span> · @Money.FormatPair(decision.ApprovedUgx, decision.ApprovedUsd)</span>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(decision.Comments))
-                    {
-                        <div class="text-muted">@decision.Comments</div>
-                    }
+                var icon = decision.Action switch
+                {
+                    ApprovalAction.Approve => "bi-check-circle-fill",
+                    ApprovalAction.Reject => "bi-x-circle-fill",
+                    _ => "bi-arrow-return-left"
+                };
+                <li>
+                    <i class="bi @icon"></i>
+                    <div>
+                        <strong>@decision.Action</strong> by @decision.DecidedByName
+                        @if (decision.Action == ApprovalAction.Approve)
+                        {
+                            <span class="req-amount"> · @Money.FormatPair(decision.ApprovedUgx, decision.ApprovedUsd)</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(decision.Comments))
+                        {
+                            <div class="text-muted">@decision.Comments</div>
+                        }
+                    </div>
                 </li>
             }
         </ul>
+        </div>
     }
 
     @if (Model.CanDecide && item.Status == RequisitionStatus.Submitted)
     {
-        <div class="card mb-4">
-            <div class="card-header">Approval decision</div>
-            <div class="card-body">
-                <form method="post" asp-page-handler="Decide" class="row g-3">
-                    <div class="col-md-3">
-                        <label class="form-label">Decision</label>
-                        <select class="form-select" asp-for="Decision.Action">
-                            <option value="@ApprovalAction.Approve">Approve</option>
-                            <option value="@ApprovalAction.Return">Return for correction</option>
-                            <option value="@ApprovalAction.Reject">Reject</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Approve UGX</label>
-                        <input class="form-control text-end amount-input" data-currency="UGX" name="Decision.ApprovedUgx" value="@Money.FormatNumber(Model.Decision.ApprovedUgx, Money.Ugx)" inputmode="decimal" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Approve USD</label>
-                        <input class="form-control text-end amount-input" data-currency="USD" name="Decision.ApprovedUsd" value="@Money.FormatNumber(Model.Decision.ApprovedUsd, Money.Usd)" inputmode="decimal" />
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Comments</label>
-                        <textarea class="form-control" asp-for="Decision.Comments" rows="2"></textarea>
-                    </div>
-                    <div class="col-12"><button class="btn btn-primary" type="submit">Record decision</button></div>
-                </form>
+        <div class="modal fade" id="decisionModal" tabindex="-1" aria-labelledby="decisionModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" asp-page-handler="Decide">
+                        <div class="modal-header">
+                            <h2 class="modal-title h5" id="decisionModalTitle"><i class="bi bi-check2-square me-2"></i>Approval decision</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Decision</label>
+                                    <select class="form-select" asp-for="Decision.Action">
+                                        <option value="@ApprovalAction.Approve">Approve</option>
+                                        <option value="@ApprovalAction.Return">Return for correction</option>
+                                        <option value="@ApprovalAction.Reject">Reject</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Approve UGX</label>
+                                    <input class="form-control text-end amount-input" data-currency="UGX" name="Decision.ApprovedUgx" value="@Money.FormatNumber(Model.Decision.ApprovedUgx, Money.Ugx)" inputmode="decimal" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Approve USD</label>
+                                    <input class="form-control text-end amount-input" data-currency="USD" name="Decision.ApprovedUsd" value="@Money.FormatNumber(Model.Decision.ApprovedUsd, Money.Usd)" inputmode="decimal" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Comments</label>
+                                    <textarea class="form-control" asp-for="Decision.Comments" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cancel</button>
+                            <button class="btn btn-primary" type="submit">Record decision</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     }
 
     @if (Model.CanDisburse && item.Status == RequisitionStatus.Approved && item.Disbursement is null)
     {
-        <div class="card mb-4">
-            <div class="card-header">Issue funds</div>
-            <div class="card-body">
-                <form method="post" asp-page-handler="Disburse" class="row g-3">
+        <div class="req-section">
+            <div class="req-section-title"><i class="bi bi-cash-coin"></i> Issue funds</div>
+            <form method="post" asp-page-handler="Disburse" class="row g-3 p-3">
                     <div class="col-md-3"><label class="form-label">UGX</label><input class="form-control text-end amount-input" data-currency="UGX" name="Disbursement.AmountUgx" value="@Money.FormatNumber(Model.Disbursement.AmountUgx, Money.Ugx)" inputmode="decimal" /></div>
                     <div class="col-md-3"><label class="form-label">USD</label><input class="form-control text-end amount-input" data-currency="USD" name="Disbursement.AmountUsd" value="@Money.FormatNumber(Model.Disbursement.AmountUsd, Money.Usd)" inputmode="decimal" /></div>
                     <div class="col-md-3">
@@ -147,26 +204,29 @@
                     <div class="col-md-6"><label class="form-label">Reference</label><input class="form-control" asp-for="Disbursement.Reference" /></div>
                     <div class="col-md-6"><label class="form-label">Notes</label><input class="form-control" asp-for="Disbursement.Notes" /></div>
                     <div class="col-12"><button class="btn btn-primary" type="submit">Record disbursement</button></div>
-                </form>
-            </div>
+            </form>
         </div>
     }
 
     @if (item.Disbursement is not null)
     {
-        <p>Issued @item.Disbursement.PaidOn.ToString("dd MMM yyyy") by @item.Disbursement.PaidByName via @item.Disbursement.Method
-            @if (!string.IsNullOrWhiteSpace(item.Disbursement.Reference))
-            {
-                <span> · @item.Disbursement.Reference</span>
-            }
-        </p>
+        <div class="req-issued">
+            <i class="bi bi-cash-coin"></i>
+            <span>Issued @item.Disbursement.PaidOn.ToString("dd MMM yyyy") by @item.Disbursement.PaidByName via @item.Disbursement.Method
+                @if (!string.IsNullOrWhiteSpace(item.Disbursement.Reference))
+                {
+                    <span> · @item.Disbursement.Reference</span>
+                }
+            </span>
+        </div>
     }
 
     @if (item.Accountability?.Lines.Count > 0)
     {
-        <h2 class="h6">Receipts</h2>
-        <div class="table-responsive">
-            <table class="table">
+        <div class="req-section">
+            <div class="req-section-title"><i class="bi bi-receipt"></i> Receipts</div>
+            <div class="table-responsive">
+            <table class="table req-lines mb-0">
                 <thead><tr><th>Date</th><th>Item</th><th>Receipt</th><th class="text-end">Amount</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var line in item.Accountability.Lines.OrderBy(l => l.LineNumber))
@@ -186,6 +246,7 @@
                 }
                 </tbody>
             </table>
+            </div>
         </div>
         @if (!string.IsNullOrWhiteSpace(item.Accountability.ReviewComments))
         {
@@ -195,7 +256,7 @@
 
     @if (Model.CanReview && item.Accountability?.Status == AccountabilityStatus.Submitted)
     {
-        <form method="post" asp-page-handler="Review" class="card card-body mb-3">
+        <form method="post" asp-page-handler="Review" class="req-section p-3">
             <label class="form-label">Accountability review</label>
             <textarea class="form-control mb-2" asp-for="ReviewComments" rows="2" placeholder="Required when the receipts do not match the cash issued, or when returning the accountability."></textarea>
             <div class="d-flex gap-2">
@@ -211,4 +272,22 @@
             <button class="btn btn-primary" type="submit">Close requisition</button>
         </form>
     }
+    </div>
 </div>
+@section Scripts {
+<script>
+    function toggleRequisitionTable() {
+        const section = document.getElementById('reqItems');
+        const button = document.getElementById('maximizeItems');
+        const full = section.classList.toggle('req-lines-full');
+        const icon = button.querySelector('i');
+        icon.className = full ? 'bi bi-fullscreen-exit' : 'bi bi-arrows-fullscreen';
+        button.title = full ? 'Exit full page' : 'View full page';
+    }
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && document.getElementById('reqItems')?.classList.contains('req-lines-full')) {
+            toggleRequisitionTable();
+        }
+    });
+</script>
+}

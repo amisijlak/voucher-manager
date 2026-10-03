@@ -77,15 +77,18 @@ public static class RequisitionFiles
 
         public void AddHeader(string organizationName, Requisition item)
         {
-            Text(Left, _y, organizationName, 11, bold: true);
-            _y -= 22;
-            Text(Left, _y, "PETTY CASH REQUISITION", 16, bold: true);
-            Text(Right, _y, item.Number, 12, bold: true, alignRight: true);
-            _y -= 18;
-            Text(Left, _y, item.Title, 11, bold: false);
-            _y -= 16;
+            FillRgb(0, PageHeight - 108, PageWidth, 108, 0.063f, 0.157f, 0.200f);
+            FillRgb(0, PageHeight - 116, PageWidth, 8, 0.769f, 0.639f, 0.353f);
+            Text(Left, PageHeight - 38, organizationName, 11, bold: true, r: 0.953f, g: 0.886f, b: 0.722f);
+            Text(Left, PageHeight - 64, "PETTY CASH REQUISITION", 18, bold: true, r: 1, g: 1, b: 1);
+            var numberWidth = TextWidth(item.Number, 11) + 18;
+            FillRgb(Right - numberWidth, PageHeight - 78, numberWidth + 6, 22, 0.961f, 0.773f, 0.094f);
+            Text(Right + 2, PageHeight - 72, item.Number, 11, bold: true, alignRight: true, r: 0.169f, g: 0.133f, b: 0);
+            _y = PageHeight - 146;
+            Text(Left, _y, item.Title, 13, bold: true, r: 0.063f, g: 0.157f, b: 0.200f);
+            _y -= 20;
             Meta("Status", StatusText.Label(item.Status));
-            Meta("Period", $"{item.PeriodStart:dd MMM yyyy} – {item.PeriodEnd:dd MMM yyyy}");
+            Meta("Period", $"{item.PeriodStart:dd MMM yyyy} - {item.PeriodEnd:dd MMM yyyy}");
             if (!string.IsNullOrWhiteSpace(item.Department))
             {
                 Meta("Department", item.Department);
@@ -102,7 +105,7 @@ public static class RequisitionFiles
                 Meta("Budget", item.BudgetPeriod.Name);
             }
 
-            _y -= 8;
+            _y -= 10;
         }
 
         public void AddTable(Requisition item)
@@ -121,7 +124,7 @@ public static class RequisitionFiles
                 Ensure(rowHeight);
                 if (shade)
                 {
-                    Fill(Left, _y - rowHeight + 10f, Right - Left, rowHeight, 0.95f);
+                    FillRgb(Left, _y - rowHeight + 10f, Right - Left, rowHeight, 0.973f, 0.957f, 0.925f);
                 }
 
                 shade = !shade;
@@ -145,8 +148,16 @@ public static class RequisitionFiles
 
         public void AddTotals(Requisition item)
         {
-            Ensure(48f);
-            _y -= 8;
+            var rows = 1 + (item.RequestedUsd != 0 ? 1 : 0);
+            if (item.ApprovedUgx != 0 || item.ApprovedUsd != 0)
+            {
+                rows += 1 + (item.ApprovedUsd != 0 ? 1 : 0);
+            }
+
+            Ensure(18f + (rows * 16f));
+            _y -= 6;
+            var boxHeight = 12f + (rows * 16f);
+            FillRgb(330, _y - boxHeight + 14f, Right - 330, boxHeight, 0.063f, 0.157f, 0.200f);
             Total("Requested UGX", Money.FormatNumber(item.RequestedUgx, Money.Ugx));
             if (item.RequestedUsd != 0)
             {
@@ -218,12 +229,12 @@ public static class RequisitionFiles
         private void DrawHeader()
         {
             Ensure(22f);
-            Fill(Left, _y - 6f, Right - Left, 18f, 0.9f);
-            Text(68f, _y, "#", 9, bold: true, alignRight: true);
-            Text(48f, _y, "Item", 9, bold: true);
-            Text(390f, _y, "Qty", 9, bold: true, alignRight: true);
-            Text(470f, _y, "Unit", 9, bold: true, alignRight: true);
-            Text(Right, _y, "Amount", 9, bold: true, alignRight: true);
+            FillRgb(Left, _y - 6f, Right - Left, 18f, 0.106f, 0.227f, 0.294f);
+            Text(68f, _y, "#", 9, bold: true, alignRight: true, r: 0.953f, g: 0.886f, b: 0.722f);
+            Text(48f, _y, "Item", 9, bold: true, r: 1, g: 1, b: 1);
+            Text(390f, _y, "Qty", 9, bold: true, alignRight: true, r: 1, g: 1, b: 1);
+            Text(470f, _y, "Unit", 9, bold: true, alignRight: true, r: 1, g: 1, b: 1);
+            Text(Right, _y, "Amount", 9, bold: true, alignRight: true, r: 0.953f, g: 0.886f, b: 0.722f);
             _y -= 20f;
         }
 
@@ -232,8 +243,8 @@ public static class RequisitionFiles
             foreach (var part in Wrap(value, 430f, 10))
             {
                 Ensure(14f);
-                Text(Left, _y, label, 10, bold: true);
-                Text(130f, _y, part, 10, bold: false);
+                Text(Left, _y, label, 10, bold: true, r: 0.541f, g: 0.408f, b: 0.075f);
+                Text(130f, _y, part, 10, bold: false, r: 0.125f, g: 0.141f, b: 0.145f);
                 label = "";
                 _y -= 14f;
             }
@@ -242,8 +253,8 @@ public static class RequisitionFiles
         private void Total(string label, string amount)
         {
             Ensure(16f);
-            Text(360f, _y, label, 10, bold: true);
-            Text(Right, _y, amount, 10, bold: true, alignRight: true);
+            Text(348f, _y, label, 10, bold: true, r: 0.953f, g: 0.886f, b: 0.722f);
+            Text(Right - 8f, _y, amount, 10, bold: true, alignRight: true, r: 1, g: 1, b: 1);
             _y -= 16f;
         }
 
@@ -259,16 +270,15 @@ public static class RequisitionFiles
             DrawHeader();
         }
 
-        private void Fill(float x, float y, float width, float height, float gray)
+        private void FillRgb(float x, float y, float width, float height, float red, float green, float blue)
         {
-            var grayText = gray.ToString("0.##", CultureInfo.InvariantCulture);
-            Op($"{grayText} g\n{Num(x)} {Num(y)} {Num(width)} {Num(height)} re\nf\n0 g\n");
+            Op($"{Num(red)} {Num(green)} {Num(blue)} rg\n{Num(x)} {Num(y)} {Num(width)} {Num(height)} re\nf\n0 g\n");
         }
 
         private void Line(float x1, float y1, float x2, float y2) =>
             Op($"{Num(x1)} {Num(y1)} m {Num(x2)} {Num(y2)} l S\n");
 
-        private void Text(float x, float y, string text, float size, bool bold, bool alignRight = false)
+        private void Text(float x, float y, string text, float size, bool bold, bool alignRight = false, float r = 0, float g = 0, float b = 0)
         {
             if (alignRight)
             {
@@ -276,10 +286,10 @@ public static class RequisitionFiles
             }
 
             var font = bold ? "/F2" : "/F1";
-            var command = $"BT\n{font} {Num(size)} Tf\n{Num(x)} {Num(y)} Td\n";
+            var command = $"BT\n{Num(r)} {Num(g)} {Num(b)} rg\n{font} {Num(size)} Tf\n{Num(x)} {Num(y)} Td\n";
             Op(Encoding.ASCII.GetBytes(command));
             Op(PdfString(text));
-            Op(" Tj\nET\n"u8.ToArray());
+            Op(" Tj\nET\n0 g\n"u8.ToArray());
         }
 
         private void Op(string text) => Op(Encoding.ASCII.GetBytes(text));
