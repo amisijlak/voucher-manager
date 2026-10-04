@@ -1,40 +1,47 @@
 @page
 @model VoucherMgt.Web.Pages.Settings.IndexModel
 @{
-    ViewData["Title"] = "Settings";
-    ViewData["Icon"] = "bi-sliders";
+    ViewData["Title"] = "Company";
+    ViewData["Icon"] = "bi-buildings";
 }
 <partial name="_Breadcrumb" />
 <div class="content-panel">
-    <div class="page-heading"><div><h1>Settings</h1><p>Letterhead, VAT, and the companies that appear on the order form.</p></div></div>
-    <form method="post" asp-page-handler="Organization" class="row g-3 mb-4">
-        <div class="col-md-6"><label class="form-label">Organization</label><input class="form-control" asp-for="Name" /></div>
-        <div class="col-md-3"><label class="form-label">Phone</label><input class="form-control" asp-for="Phone" /></div>
-        <div class="col-md-3"><label class="form-label">Default VAT %</label><input class="form-control" asp-for="DefaultVatRate" type="number" step="0.01" /></div>
-        <div class="col-md-6"><label class="form-label">Address</label><input class="form-control" asp-for="Address" /></div>
-        <div class="col-md-3"><label class="form-label">City</label><input class="form-control" asp-for="City" /></div>
-        <div class="col-md-3"><label class="form-label">Country</label><input class="form-control" asp-for="Country" /></div>
-        <div class="col-12"><label class="form-label">Payment note</label><input class="form-control" asp-for="PaymentNote" /></div>
-        <div class="col-12"><button class="btn btn-primary" type="submit">Save organization</button></div>
+    <div class="page-heading">
+        <div>
+            <h1>Company</h1>
+            <p>Name, contact, and logo for each company that can be selected on an order form.</p>
+        </div>
+    </div>
+    <form method="post" asp-page-handler="Vat" class="row g-3 align-items-end mb-4">
+        <div class="col-md-3">
+            <label class="form-label">VAT %</label>
+            <input class="form-control" asp-for="DefaultVatRate" type="number" step="0.01" />
+        </div>
+        <div class="col-md-3"><button class="btn btn-outline-primary" type="submit">Save VAT</button></div>
     </form>
-    <h2 class="h5">Trading companies</h2>
-    <table class="table">
-        <thead><tr><th>Name</th><th>Short name</th><th>Account</th><th></th></tr></thead>
-        <tbody>
+    <div class="company-board">
         @foreach (var company in Model.Companies)
         {
-            <tr>
-                <td colspan="4">
-                    <form method="post" asp-page-handler="Company" class="row g-2">
-                        <input type="hidden" name="CompanyId" value="@company.Id" />
-                        <div class="col-md-4"><input class="form-control" name="CompanyName" value="@company.Name" /></div>
-                        <div class="col-md-3"><input class="form-control" name="ShortName" value="@company.ShortName" /></div>
-                        <div class="col-md-3"><input class="form-control" name="AccountNumber" value="@company.AccountNumber" placeholder="Account number" /></div>
-                        <div class="col-md-2"><button class="btn btn-outline-primary w-100" type="submit">Save</button></div>
-                    </form>
-                </td>
-            </tr>
+            <form method="post" asp-page-handler="Company" enctype="multipart/form-data" class="company-setup">
+                <input type="hidden" name="CompanyId" value="@company.Id" />
+                <div class="company-setup-logo">
+                    @if (company.LogoFilePath is not null)
+                    {
+                        <img src="@Url.Page(null, "Logo", new { companyId = company.Id })" alt="" />
+                    }
+                    else
+                    {
+                        <span>@company.ShortName</span>
+                    }
+                </div>
+                <label class="form-label">Name</label>
+                <input class="form-control" name="CompanyName" value="@company.Name" required />
+                <label class="form-label">Contact</label>
+                <input class="form-control" name="Contact" value="@company.Contact" placeholder="Phone or email" />
+                <label class="form-label">Logo</label>
+                <input class="form-control" type="file" name="Logo" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" />
+                <button class="btn btn-primary" type="submit">Save</button>
+            </form>
         }
-        </tbody>
-    </table>
+    </div>
 </div>

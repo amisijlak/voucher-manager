@@ -50,10 +50,9 @@
         <div class="sidebar-heading">Administration</div>
         <nav class="sidebar-nav">
             <a class="sidebar-link @(currentPage.StartsWith("/Reports") ? "active" : "")" asp-page="/Reports/Index"><i class="bi bi-bar-chart"></i><span>Reports</span></a>
-            <a class="sidebar-link @(currentPage.StartsWith("/Admin") ? "active" : "")" asp-page="/Admin/Organizations"><i class="bi bi-buildings"></i><span>Organizations</span></a>
+            <a class="sidebar-link @(currentPage.StartsWith("/Settings") ? "active" : "")" asp-page="/Settings/Index"><i class="bi bi-buildings"></i><span>Company</span></a>
             <a class="sidebar-link @(currentPage.Contains("/Account/Roles") ? "active" : "")" asp-page="/Account/Roles"><i class="bi bi-shield-check"></i><span>Roles</span></a>
             <a class="sidebar-link @(currentPage.Contains("/Account/UserRoles") ? "active" : "")" asp-page="/Account/UserRoles"><i class="bi bi-people"></i><span>User roles</span></a>
-            <a class="sidebar-link @(currentPage.StartsWith("/Settings") ? "active" : "")" asp-page="/Settings/Index"><i class="bi bi-sliders"></i><span>Settings</span></a>
         </nav>
     </aside>
     <div class="content-wrapper">

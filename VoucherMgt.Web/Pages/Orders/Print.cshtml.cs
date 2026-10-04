@@ -11,11 +11,13 @@ public class PrintModel : PageModel
 {
     private readonly IRepository _repository;
     private readonly IOrganizationScope _scope;
+    private readonly IWebHostEnvironment _environment;
 
-    public PrintModel(IRepository repository, IOrganizationScope scope)
+    public PrintModel(IRepository repository, IOrganizationScope scope, IWebHostEnvironment environment)
     {
         _repository = repository;
         _scope = scope;
+        _environment = environment;
     }
 
     public OrderForm? Item { get; private set; }
@@ -38,5 +40,13 @@ public class PrintModel : PageModel
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
         return Page();
+    }
+
+    public async Task<IActionResult> OnGetLogoAsync(int companyId, CancellationToken cancellationToken)
+    {
+        var organization = await _scope.GetRequiredAsync(cancellationToken);
+        var company = await _repository.Set<TradingCompany>()
+            .FirstOrDefaultAsync(c => c.Id == companyId && c.OrganizationId == organization.Id && c.IsActive, cancellationToken);
+        return company is null ? NotFound() : CompanyLogos.Open(_environment, company, organization.Id);
     }
 }

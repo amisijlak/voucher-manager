@@ -5,33 +5,88 @@
     ViewData["Title"] = "Accountability";
     ViewData["Icon"] = "bi-receipt";
     var item = Model.Item!;
+    var issuedUgx = item.Disbursement?.AmountUgx ?? 0;
+    var issuedUsd = item.Disbursement?.AmountUsd ?? 0;
+    var requiredCount = item.Lines.Count(l => l.Amount > 0);
 }
 <partial name="_Breadcrumb" />
 <div class="content-panel">
     <div class="page-heading">
         <div>
             <h1>Account for @item.Number</h1>
-            <p>Issued @Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0). List each receipt. The difference is shown to the reviewer.</p>
+            <p>The items that had money on this requisition are already listed. An item is accounted when its date is selected and it has a receipt number, a comment, or a proof file. Save keeps the sheet once at least one item is accounted. You can account for the whole list, or open one item on its own.</p>
+        </div>
+        <a class="btn btn-view" asp-page="Details" asp-route-requisitionId="@item.Id"><i class="bi bi-eye me-1"></i>View</a>
+    </div>
+    <div class="acct-board" id="acctSummary" data-issued-ugx="@issuedUgx" data-issued-usd="@issuedUsd" data-required="@requiredCount">
+        <div class="acct-board-top">
+            <div>
+                <span>Progress</span>
+                <strong id="acctFar">0 of 0 items accounted</strong>
+            </div>
+            <b id="acctPercent">0%</b>
+        </div>
+        <div class="acct-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="acctItemBar"><span id="acctItemFill"></span></div>
+        <div class="acct-money-line" id="acctUgxLine">
+            <span>UGX</span>
+            <div class="acct-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="acctUgxBar"><span id="acctUgxFill"></span></div>
+            <strong id="acctUgxText"></strong>
+        </div>
+        <div class="acct-money-line" id="acctUsdLine">
+            <span>USD</span>
+            <div class="acct-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="acctUsdBar"><span id="acctUsdFill"></span></div>
+            <strong id="acctUsdText"></strong>
+        </div>
+        <div class="acct-progress">
+            <div><span>Items accounted</span><strong id="acctDoneCount">0</strong></div>
+            <div><span>Items pending</span><strong id="acctPendingCount">0</strong></div>
+            <div><span>Amount done</span><strong id="acctSpent">@Money.FormatPair(0, 0)</strong></div>
+            <div><span>Deficit</span><strong id="acctRemain">@Money.FormatPair(issuedUgx, issuedUsd)</strong></div>
         </div>
     </div>
+    <p class="acct-message" id="acctMessage"></p>
     <form method="post" enctype="multipart/form-data">
         <div class="table-responsive">
             <table class="table" id="receiptTable">
-                <thead><tr><th>Date</th><th>How it was used</th><th>Receipt no.</th><th>Amount</th><th>Currency</th><th>File</th><th></th></tr></thead>
+                <thead><tr><th></th><th>Date</th><th>Item</th><th>Receipt no.</th><th>Comment</th><th class="text-end">Amount</th><th>Currency</th><th>File</th><th></th></tr></thead>
                 <tbody>
                 @for (var i = 0; i < Model.Input.Lines.Count; i++)
                 {
                     var line = Model.Input.Lines[i];
-                    <tr>
-                        <td><input class="form-control" type="date" name="Input.Lines[@i].SpentOn" value="@line.SpentOn.ToString("yyyy-MM-dd")" /></td>
-                        <td><input class="form-control" name="Input.Lines[@i].Description" value="@line.Description" /></td>
-                        <td><input class="form-control" name="Input.Lines[@i].ReceiptNumber" value="@line.ReceiptNumber" /></td>
-                        <td><input class="form-control" type="number" min="0" step="0.01" name="Input.Lines[@i].Amount" value="@line.Amount" /></td>
+                    var locked = line.RequisitionLineId is not null;
+                    <tr data-locked="@(locked ? "1" : "0")">
+                        <td class="acct-mark">
+                            <i class="bi bi-check-lg acct-tick" hidden></i>
+                            @if (locked) { <span class="acct-lock" title="From the requisition"><i class="bi bi-lock"></i></span> } else { <span class="acct-extra">Added</span> }
+                        </td>
+                        <td><input class="form-control acct-date" type="date" name="Input.Lines[@i].SpentOn" value="@(line.SpentOn?.ToString("yyyy-MM-dd"))" /></td>
                         <td>
-                            <select class="form-select" name="Input.Lines[@i].Currency">
-                                <option value="UGX" selected="@(line.Currency != Money.Usd ? "selected" : null)">UGX</option>
-                                <option value="USD" selected="@(line.Currency == Money.Usd ? "selected" : null)">USD</option>
-                            </select>
+                            <input type="hidden" name="Input.Lines[@i].RequisitionLineId" value="@line.RequisitionLineId" />
+                            @if (locked)
+                            {
+                                <input class="form-control" name="Input.Lines[@i].Description" value="@line.Description" readonly />
+                            }
+                            else
+                            {
+                                <input class="form-control" name="Input.Lines[@i].Description" value="@line.Description" />
+                            }
+                        </td>
+                        <td><input class="form-control acct-receipt" name="Input.Lines[@i].ReceiptNumber" value="@line.ReceiptNumber" /></td>
+                        <td><input class="form-control acct-comment" name="Input.Lines[@i].Comment" value="@line.Comment" /></td>
+                        <td><input class="form-control text-end acct-amount" type="number" min="0" step="0.01" name="Input.Lines[@i].Amount" value="@line.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)" /></td>
+                        <td>
+                            @if (locked)
+                            {
+                                <input type="hidden" name="Input.Lines[@i].Currency" value="@line.Currency" />
+                                <span class="acct-currency">@line.Currency</span>
+                            }
+                            else
+                            {
+                                <select class="form-select acct-currency-input" name="Input.Lines[@i].Currency">
+                                    <option value="UGX" selected="@(line.Currency != Money.Usd ? "selected" : null)">UGX</option>
+                                    <option value="USD" selected="@(line.Currency == Money.Usd ? "selected" : null)">USD</option>
+                                </select>
+                            }
                         </td>
                         <td>
                             <input type="hidden" name="Input.Lines[@i].ExistingPath" value="@line.ExistingPath" />
@@ -42,47 +97,262 @@
                             }
                             <input class="form-control" type="file" name="Input.Lines[@i].File" accept=".pdf,.jpg,.jpeg,.png,.webp" />
                         </td>
-                        <td><button class="btn btn-sm btn-outline-primary" type="button" onclick="removeReceipt(this)">Remove</button></td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-view" type="button" onclick="openItemAccount(this)" title="Account this item"><i class="bi bi-receipt"></i></button>
+                            @if (!locked)
+                            {
+                                <button class="btn btn-sm btn-danger" type="button" onclick="removeReceipt(this)" title="Remove added item"><i class="bi bi-trash"></i></button>
+                            }
+                        </td>
                     </tr>
                 }
                 </tbody>
             </table>
         </div>
-        <button class="btn btn-outline-primary" type="button" onclick="addReceipt()">Add receipt</button>
+        <button class="btn btn-outline-primary" type="button" onclick="addReceipt()">Add item</button>
         <div class="mt-3">
             <label class="form-label">Notes</label>
             <textarea class="form-control" asp-for="Input.Notes" rows="2"></textarea>
         </div>
         <div class="mt-3 d-flex gap-2">
-            <button class="btn btn-outline-primary" type="submit" asp-page-handler="Save">Save</button>
-            <button class="btn btn-primary" type="submit" asp-page-handler="Submit">Submit accountability</button>
+            <button class="btn btn-outline-primary" type="submit" asp-page-handler="Save">Save progress</button>
+            <button class="btn btn-primary" type="submit" asp-page-handler="Submit" id="submitAccountability">Close accountability</button>
         </div>
     </form>
+    <div class="modal fade" id="itemAccountModal" tabindex="-1" aria-labelledby="itemAccountTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="itemAccountTitle"><i class="bi bi-receipt me-2"></i>Account this item</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Record this item on its own. The list stays in place, and Save progress keeps whatever you have entered so far.</p>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="itemAccountDate">Date</label>
+                            <input class="form-control" type="date" id="itemAccountDate" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="itemAccountDescription">Item</label>
+                            <input class="form-control" id="itemAccountDescription" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="itemAccountReceipt">Receipt no.</label>
+                            <input class="form-control" id="itemAccountReceipt" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label" for="itemAccountComment">Comment</label>
+                            <input class="form-control" id="itemAccountComment" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="itemAccountAmount">Amount</label>
+                            <input class="form-control text-end" type="number" min="0" step="0.01" id="itemAccountAmount" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="itemAccountCurrency">Currency</label>
+                            <select class="form-select" id="itemAccountCurrency">
+                                <option value="UGX">UGX</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="itemAccountFile">Receipt file</label>
+                            <div class="small text-muted mb-1" id="itemAccountExisting"></div>
+                            <input class="form-control" type="file" id="itemAccountFile" accept=".pdf,.jpg,.jpeg,.png,.webp" />
+                        </div>
+                    </div>
+                    <p class="text-danger small mt-2 mb-0" id="itemAccountError" hidden></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="applyItemAccount">Apply to this item</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <template id="receiptTemplate">
-    <tr>
-        <td><input class="form-control" type="date" name="Input.Lines[__i__].SpentOn" value="@DateTime.Today.ToString("yyyy-MM-dd")" /></td>
-        <td><input class="form-control" name="Input.Lines[__i__].Description" /></td>
-        <td><input class="form-control" name="Input.Lines[__i__].ReceiptNumber" /></td>
-        <td><input class="form-control" type="number" min="0" step="0.01" name="Input.Lines[__i__].Amount" /></td>
-        <td><select class="form-select" name="Input.Lines[__i__].Currency"><option value="UGX">UGX</option><option value="USD">USD</option></select></td>
+    <tr data-locked="0">
+        <td class="acct-mark"><i class="bi bi-check-lg acct-tick" hidden></i><span class="acct-extra">Added</span></td>
+        <td><input class="form-control acct-date" type="date" name="Input.Lines[__i__].SpentOn" /></td>
+        <td>
+            <input type="hidden" name="Input.Lines[__i__].RequisitionLineId" value="" />
+            <input class="form-control" name="Input.Lines[__i__].Description" />
+        </td>
+        <td><input class="form-control acct-receipt" name="Input.Lines[__i__].ReceiptNumber" /></td>
+        <td><input class="form-control acct-comment" name="Input.Lines[__i__].Comment" /></td>
+        <td><input class="form-control text-end acct-amount" type="number" min="0" step="0.01" name="Input.Lines[__i__].Amount" value="0" /></td>
+        <td><select class="form-select acct-currency-input" name="Input.Lines[__i__].Currency"><option value="UGX">UGX</option><option value="USD">USD</option></select></td>
         <td><input class="form-control" type="file" name="Input.Lines[__i__].File" accept=".pdf,.jpg,.jpeg,.png,.webp" /></td>
-        <td><button class="btn btn-sm btn-outline-primary" type="button" onclick="removeReceipt(this)">Remove</button></td>
+        <td class="text-nowrap"><button class="btn btn-sm btn-view" type="button" onclick="openItemAccount(this)" title="Account this item"><i class="bi bi-receipt"></i></button> <button class="btn btn-sm btn-danger" type="button" onclick="removeReceipt(this)" title="Remove added item"><i class="bi bi-trash"></i></button></td>
     </tr>
 </template>
 @section Scripts {
 <script>
+    const summary = document.getElementById('acctSummary');
+    const issuedUgx = Number(summary.dataset.issuedUgx);
+    const issuedUsd = Number(summary.dataset.issuedUsd);
+    const requiredCount = Number(summary.dataset.required);
+    function money(ugx, usd) {
+        const parts = [];
+        if (issuedUgx !== 0 || ugx !== 0) parts.push(one('UGX', ugx));
+        if (issuedUsd !== 0 || usd !== 0) parts.push(one('USD', usd));
+        return parts.length ? parts.join(' + ') : 'UGX 0';
+    }
+    function one(currency, value) {
+        const number = Number(value) || 0;
+        if (currency === 'USD') return '$' + number.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return 'UGX ' + number.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    }
+    function gapText(currency, remain) {
+        if (Math.abs(remain) < 0.001) return 'no deficit';
+        if (remain > 0) return 'deficit ' + one(currency, remain);
+        return 'over by ' + one(currency, Math.abs(remain));
+    }
+    function paintBar(bar, fill, ratio, over) {
+        const percent = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+        fill.style.width = percent + '%';
+        fill.classList.toggle('is-complete', percent >= 100 && !over);
+        fill.classList.toggle('is-over', over);
+        bar.setAttribute('aria-valuenow', String(percent));
+        return percent;
+    }
+    function refreshAccountability() {
+        const rows = [...document.querySelectorAll('#receiptTable tbody tr')];
+        let ugx = 0, usd = 0, doneItems = 0;
+        rows.forEach(row => {
+            const amount = Number(row.querySelector('.acct-amount')?.value || 0);
+            const currency = row.querySelector('[name$=".Currency"]')?.value || 'UGX';
+            if (currency === 'USD') usd += amount; else ugx += amount;
+            const done = rowAccounted(row);
+            if (done) doneItems += 1;
+            row.classList.toggle('acct-row-done', done);
+            const tick = row.querySelector('.acct-tick');
+            if (tick) tick.hidden = !done;
+        });
+        const pendingItems = rows.length - doneItems;
+        const remainUgx = issuedUgx - ugx;
+        const remainUsd = issuedUsd - usd;
+        const balanced = Math.abs(remainUgx) < 0.001 && Math.abs(remainUsd) < 0.001;
+        const itemRatio = rows.length === 0 ? 0 : doneItems / rows.length;
+        paintBar(document.getElementById('acctItemBar'), document.getElementById('acctItemFill'), itemRatio, false);
+        document.getElementById('acctPercent').textContent = Math.round(itemRatio * 100) + '%';
+        document.getElementById('acctFar').textContent = doneItems + ' of ' + rows.length + ' items accounted';
+        document.getElementById('acctDoneCount').textContent = String(doneItems);
+        document.getElementById('acctPendingCount').textContent = String(pendingItems);
+        document.getElementById('acctSpent').textContent = money(ugx, usd);
+        const remain = document.getElementById('acctRemain');
+        const remainParts = [];
+        if (Math.abs(remainUgx) >= 0.001) remainParts.push(remainUgx > 0 ? one('UGX', remainUgx) : 'over ' + one('UGX', Math.abs(remainUgx)));
+        if (Math.abs(remainUsd) >= 0.001) remainParts.push(remainUsd > 0 ? one('USD', remainUsd) : 'over ' + one('USD', Math.abs(remainUsd)));
+        remain.textContent = remainParts.length ? remainParts.join(' + ') : 'None';
+        remain.classList.toggle('is-clear', balanced);
+        remain.classList.toggle('is-over', !balanced && (remainUgx < -0.001 || remainUsd < -0.001) && remainUgx <= 0.001 && remainUsd <= 0.001);
+        const ugxRatio = issuedUgx > 0 ? ugx / issuedUgx : (ugx > 0 ? 1 : 0);
+        const usdRatio = issuedUsd > 0 ? usd / issuedUsd : (usd > 0 ? 1 : 0);
+        paintBar(document.getElementById('acctUgxBar'), document.getElementById('acctUgxFill'), ugxRatio, remainUgx < -0.001);
+        paintBar(document.getElementById('acctUsdBar'), document.getElementById('acctUsdFill'), usdRatio, remainUsd < -0.001);
+        document.getElementById('acctUgxText').textContent = one('UGX', ugx) + ' done · ' + gapText('UGX', remainUgx);
+        document.getElementById('acctUsdText').textContent = one('USD', usd) + ' done · ' + gapText('USD', remainUsd);
+        document.getElementById('acctUgxLine').hidden = issuedUgx === 0 && ugx === 0;
+        document.getElementById('acctUsdLine').hidden = issuedUsd === 0 && usd === 0;
+        const message = document.getElementById('acctMessage');
+        const submit = document.getElementById('submitAccountability');
+        const requiredRows = rows.filter(row => row.dataset.locked === '1');
+        const requiredDone = requiredRows.length >= requiredCount && requiredRows.every(rowAccounted);
+        submit.disabled = !balanced || !requiredDone;
+        if (balanced && requiredDone) {
+            message.textContent = 'Every requisition item is accounted, and the total matches the amount issued. You can close this accountability.';
+        } else if (pendingItems > 0) {
+            const deficit = [];
+            if (remainUgx > 0.001) deficit.push(one('UGX', remainUgx));
+            if (remainUsd > 0.001) deficit.push(one('USD', remainUsd));
+            message.textContent = pendingItems + ' item' + (pendingItems === 1 ? '' : 's') + ' still pending. An item is accounted when its date is selected and it has a receipt number, a comment, or a proof file. Save keeps this sheet once at least one item is accounted. Amount done is ' + money(ugx, usd) + '. Deficit ' + (deficit.join(' + ') || 'none') + '.';
+        } else {
+            message.textContent = 'Save keeps this progress. Close accountability when the accounted total equals ' + money(issuedUgx, issuedUsd) + '.';
+        }
+    }
+    function rowAccounted(row) {
+        const date = row.querySelector('.acct-date')?.value;
+        const receipt = row.querySelector('.acct-receipt')?.value.trim();
+        const comment = row.querySelector('.acct-comment')?.value.trim();
+        const existing = row.querySelector('[name$=".ExistingName"]')?.value.trim();
+        const chosen = row.querySelector('input[type="file"]')?.files?.length > 0;
+        return Boolean(date && (receipt || comment || existing || chosen));
+    }
+    let accountRow = null;
+    function openItemAccount(button) {
+        accountRow = button.closest('tr');
+        const locked = accountRow.dataset.locked === '1';
+        const description = accountRow.querySelector('[name$=".Description"]');
+        document.getElementById('itemAccountDate').value = accountRow.querySelector('[name$=".SpentOn"]').value;
+        const itemField = document.getElementById('itemAccountDescription');
+        itemField.value = description.value;
+        itemField.readOnly = locked;
+        document.getElementById('itemAccountReceipt').value = accountRow.querySelector('.acct-receipt').value;
+        document.getElementById('itemAccountComment').value = accountRow.querySelector('.acct-comment').value;
+        document.getElementById('itemAccountAmount').value = accountRow.querySelector('.acct-amount').value;
+        const currency = document.getElementById('itemAccountCurrency');
+        currency.value = accountRow.querySelector('[name$=".Currency"]').value || 'UGX';
+        currency.disabled = locked;
+        const existing = accountRow.querySelector('[name$=".ExistingName"]')?.value;
+        const fileLabel = document.getElementById('itemAccountExisting');
+        const chosen = accountRow.querySelector('input[type="file"]')?.files?.[0]?.name;
+        fileLabel.textContent = chosen ? 'Selected: ' + chosen : (existing ? 'Current file: ' + existing : '');
+        document.getElementById('itemAccountFile').value = '';
+        document.getElementById('itemAccountError').hidden = true;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('itemAccountModal')).show();
+    }
+    document.getElementById('applyItemAccount').addEventListener('click', () => {
+        if (!accountRow) return;
+        const locked = accountRow.dataset.locked === '1';
+        const description = document.getElementById('itemAccountDescription').value.trim();
+        const date = document.getElementById('itemAccountDate').value;
+        const error = document.getElementById('itemAccountError');
+        if (!locked && !description) {
+            error.textContent = 'Name the item before applying it.';
+            error.hidden = false;
+            return;
+        }
+        accountRow.querySelector('.acct-date').value = date;
+        if (!locked) accountRow.querySelector('[name$=".Description"]').value = description;
+        accountRow.querySelector('.acct-receipt').value = document.getElementById('itemAccountReceipt').value;
+        accountRow.querySelector('.acct-comment').value = document.getElementById('itemAccountComment').value;
+        accountRow.querySelector('.acct-amount').value = document.getElementById('itemAccountAmount').value || '0';
+        if (!locked) accountRow.querySelector('[name$=".Currency"]').value = document.getElementById('itemAccountCurrency').value;
+        const chosen = document.getElementById('itemAccountFile').files;
+        if (chosen.length) {
+            const transfer = new DataTransfer();
+            transfer.items.add(chosen[0]);
+            accountRow.querySelector('input[type="file"]').files = transfer.files;
+        }
+        refreshAccountability();
+        bootstrap.Modal.getInstance(document.getElementById('itemAccountModal')).hide();
+    });
     function addReceipt() {
         const body = document.querySelector('#receiptTable tbody');
         body.insertAdjacentHTML('beforeend', document.getElementById('receiptTemplate').innerHTML.replaceAll('__i__', body.rows.length));
+        refreshAccountability();
     }
     function removeReceipt(button) {
-        const body = document.querySelector('#receiptTable tbody');
-        if (body.rows.length === 1) return;
-        button.closest('tr').remove();
-        [...body.rows].forEach((row, index) => {
-            row.querySelectorAll('[name]').forEach(input => input.name = input.name.replace(/Lines\[\d+\]/, 'Lines[' + index + ']'));
+        const row = button.closest('tr');
+        if (row.dataset.locked === '1') return;
+        row.remove();
+        [...document.querySelectorAll('#receiptTable tbody tr')].forEach((item, index) => {
+            item.querySelectorAll('[name]').forEach(input => input.name = input.name.replace(/Lines\[\d+\]/, 'Lines[' + index + ']'));
         });
+        refreshAccountability();
     }
+    document.getElementById('receiptTable').addEventListener('input', refreshAccountability);
+    document.getElementById('receiptTable').addEventListener('change', refreshAccountability);
+    document.getElementById('receiptTable').closest('form').addEventListener('submit', event => {
+        const save = event.submitter?.id !== 'submitAccountability';
+        if (save && ![...document.querySelectorAll('#receiptTable tbody tr')].some(rowAccounted)) {
+            event.preventDefault();
+            document.getElementById('acctMessage').textContent = 'Save once at least one item is accounted. Select its date and add a receipt number, a comment, or a proof file.';
+        }
+    });
+    refreshAccountability();
 </script>
 }

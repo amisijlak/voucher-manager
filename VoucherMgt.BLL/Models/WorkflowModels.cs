@@ -58,9 +58,11 @@ public sealed class DisbursementDraft
 
 public sealed class AccountabilityLineDraft
 {
-    public DateOnly SpentOn { get; set; }
+    public int? RequisitionLineId { get; set; }
+    public DateOnly? SpentOn { get; set; }
     public string Description { get; set; } = string.Empty;
     public string? ReceiptNumber { get; set; }
+    public string? Comment { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = Money.Ugx;
     public string? ReceiptFilePath { get; set; }

@@ -11,6 +11,19 @@ public static class StatusText
         _ => status.ToString()
     };
 
+    public static string Icon(RequisitionStatus status) => status switch
+    {
+        RequisitionStatus.Draft => "bi-pencil",
+        RequisitionStatus.Submitted or RequisitionStatus.AccountabilitySubmitted => "bi-send",
+        RequisitionStatus.Approved => "bi-check-lg",
+        RequisitionStatus.Returned or RequisitionStatus.AccountabilityReturned => "bi-arrow-return-left",
+        RequisitionStatus.Rejected => "bi-x-lg",
+        RequisitionStatus.Disbursed => "bi-cash-coin",
+        RequisitionStatus.Accounted => "bi-receipt-cutoff",
+        RequisitionStatus.Closed => "bi-lock",
+        _ => "bi-flag"
+    };
+
     public static string Badge(RequisitionStatus status) => status switch
     {
         RequisitionStatus.Submitted or RequisitionStatus.AccountabilitySubmitted => "bg-info",

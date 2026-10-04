@@ -1,0 +1,156 @@
+@page "{requisitionId:int}"
+@model VoucherMgt.Web.Pages.Accountability.DetailsModel
+@using VoucherMgt.Common
+@using VoucherMgt.DAL.Entities
+@{
+    ViewData["Title"] = "Accountability";
+    ViewData["Icon"] = "bi-receipt";
+    var item = Model.Item!;
+    var lines = item.Accountability?.Lines.OrderBy(l => l.LineNumber).ToList() ?? [];
+    var spentUgx = lines.Where(l => l.Currency == Money.Ugx && Accounted(l)).Sum(l => l.Amount);
+    var spentUsd = lines.Where(l => l.Currency == Money.Usd && Accounted(l)).Sum(l => l.Amount);
+    var issuedUgx = item.Disbursement?.AmountUgx ?? 0;
+    var issuedUsd = item.Disbursement?.AmountUsd ?? 0;
+    var requiredIds = item.Lines.Where(l => l.Amount > 0).Select(l => l.Id).ToList();
+    var accountedIds = lines.Where(Accounted).Where(l => l.RequisitionLineId is not null).Select(l => l.RequisitionLineId!.Value).ToHashSet();
+    var everyItem = requiredIds.Count > 0 && requiredIds.All(accountedIds.Contains);
+    var complete = item.Status is RequisitionStatus.Accounted or RequisitionStatus.Closed
+        || (everyItem && spentUgx == issuedUgx && spentUsd == issuedUsd);
+    bool Accounted(AccountabilityLine line) =>
+        line.SpentOn is not null
+        && (!string.IsNullOrWhiteSpace(line.ReceiptNumber)
+            || !string.IsNullOrWhiteSpace(line.Comment)
+            || !string.IsNullOrWhiteSpace(line.ReceiptFileName));
+    bool ImageProof(AccountabilityLine line)
+    {
+        var name = (line.ReceiptFileName ?? line.ReceiptFilePath ?? "").ToLowerInvariant();
+        return name.EndsWith(".jpg") || name.EndsWith(".jpeg") || name.EndsWith(".png") || name.EndsWith(".webp");
+    }
+}
+<partial name="_Breadcrumb" />
+<div class="content-panel req-sheet">
+    <div class="req-hero">
+        <div class="req-hero-main">
+            <div class="req-kicker-row">
+                <div class="req-kicker"><i class="bi bi-receipt"></i> Petty cash accountability</div>
+                <div class="req-hero-side no-print">
+                    <div class="d-flex gap-2 flex-wrap justify-content-end">
+                        <a class="btn btn-view" asp-page="/Requisitions/Details" asp-route-id="@item.Id"><i class="bi bi-cash-stack me-1"></i>@item.Number</a>
+                        <button class="btn btn-primary" type="button" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+                    </div>
+                </div>
+            </div>
+            <div class="req-number-row">
+                <h1 class="req-number">
+                    <span class="req-fact acct-completion @(complete ? "acct-completion-completed" : "acct-completion-partial")">
+                        <i class="bi @(complete ? "bi-check-lg" : "bi-hourglass-split")"></i>
+                        @(complete ? "Completed" : "Partial")
+                    </span>
+                </h1>
+            </div>
+            <p class="req-title">@item.Title</p>
+            <div class="req-facts">
+                <div class="req-fact">
+                    <span class="req-fact-label">Issued</span>
+                    <span>@Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0)</span>
+                </div>
+                <div class="req-fact">
+                    <span class="req-fact-label">Accounted</span>
+                    <span>@Money.FormatPair(spentUgx, spentUsd)</span>
+                </div>
+                @if (item.Disbursement is not null)
+                {
+                    <div class="req-fact">
+                        <span class="req-fact-label">Paid</span>
+                        <span><i class="bi bi-calendar"></i> @item.Disbursement.PaidOn.ToString("dd MMM yyyy")</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="req-body">
+        @if (!string.IsNullOrWhiteSpace(item.Accountability?.Notes))
+        {
+            <div class="req-purpose"><i class="bi bi-chat-left-text"></i><span>@item.Accountability.Notes</span></div>
+        }
+        <div class="req-section">
+            <div class="req-section-title"><span><i class="bi bi-list-ol"></i> Items</span></div>
+            @if (lines.Count == 0)
+            {
+                <p class="text-muted mb-0">Nothing has been saved on this accountability yet.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table req-lines acct-view mb-0">
+                        <thead><tr><th></th><th>Date</th><th>Item</th><th>Receipt no.</th><th>Comment</th><th class="text-end">Amount</th><th class="no-print">Proof</th></tr></thead>
+                        <tbody>
+                        @foreach (var line in lines)
+                        {
+                            var accounted = Accounted(line);
+                            var image = ImageProof(line);
+                            <tr class="@(accounted ? "acct-row-done" : null)">
+                                <td>@if (accounted) { <i class="bi bi-check-lg acct-tick"></i> }</td>
+                                <td>@(line.SpentOn?.ToString("dd MMM yyyy") ?? "—")</td>
+                                <td>@line.Description</td>
+                                <td>@(string.IsNullOrWhiteSpace(line.ReceiptNumber) ? "—" : line.ReceiptNumber)</td>
+                                <td>@(string.IsNullOrWhiteSpace(line.Comment) ? "—" : line.Comment)</td>
+                                <td class="num">@Money.Format(line.Amount, line.Currency)</td>
+                                <td class="text-nowrap no-print">
+                                    @if (line.ReceiptFilePath is not null)
+                                    {
+                                        <button class="btn btn-sm btn-view" type="button" onclick="previewProof(this)" aria-label="Preview proof" data-url="@Url.Page(null, "Proof", new { requisitionId = item.Id, lineId = line.Id, download = false })" data-kind="@(image ? "image" : "file")"><i class="bi bi-eye"></i></button>
+                                        <a class="btn btn-sm btn-primary" asp-page-handler="Proof" asp-route-requisitionId="@item.Id" asp-route-lineId="@line.Id" asp-route-download="true" aria-label="Download proof"><i class="bi bi-download"></i></a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+<div class="modal fade no-print" id="proofModal" tabindex="-1" aria-labelledby="proofModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="proofModalTitle"><i class="bi bi-paperclip me-2"></i>Proof</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body acct-proof-body">
+                <img id="proofImage" alt="Proof" hidden />
+                <iframe id="proofFrame" title="Proof" hidden></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+@section Scripts {
+<script>
+    function previewProof(button) {
+        const image = document.getElementById('proofImage');
+        const frame = document.getElementById('proofFrame');
+        const url = button.dataset.url;
+        const picture = button.dataset.kind === 'image';
+        image.hidden = !picture;
+        frame.hidden = picture;
+        if (picture) {
+            image.src = url;
+            frame.removeAttribute('src');
+        } else {
+            frame.src = url;
+            image.removeAttribute('src');
+        }
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('proofModal')).show();
+    }
+    document.getElementById('proofModal').addEventListener('hidden.bs.modal', () => {
+        document.getElementById('proofImage').removeAttribute('src');
+        document.getElementById('proofFrame').removeAttribute('src');
+    });
+</script>
+}

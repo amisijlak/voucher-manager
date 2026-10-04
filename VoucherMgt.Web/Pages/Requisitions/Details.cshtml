@@ -11,39 +11,56 @@
 <partial name="_Breadcrumb" />
 <div class="content-panel req-sheet">
     <div class="req-hero">
-        <div>
-            <div class="req-kicker"><i class="bi bi-cash-stack"></i> Petty cash requisition</div>
-            <h1 class="tracking-number">@item.Number</h1>
+        <div class="req-hero-main">
+            <div class="req-kicker-row">
+                <div class="req-kicker"><i class="bi bi-cash-stack"></i> Petty cash requisition</div>
+                <div class="req-hero-side">
+                    <div class="d-flex gap-2 flex-wrap justify-content-end">
+                        <a class="btn btn-pdf" asp-page-handler="Pdf" asp-route-id="@item.Id"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+                        <a class="btn btn-excel" asp-page-handler="Csv" asp-route-id="@item.Id"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a>
+                        <button class="btn btn-history" type="button" data-bs-toggle="modal" data-bs-target="#historyModal"><i class="bi bi-clock-history me-1"></i>Approval history</button>
+                        @if (item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
+                        {
+                            <a class="btn btn-view" asp-page="Edit" asp-route-id="@item.Id"><i class="bi bi-pencil me-1"></i>Edit</a>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="req-number-row">
+                <h1 class="req-number">
+                    <span class="req-fact req-number-badge">
+                        <span class="req-number-main"><i class="bi bi-hash"></i><span class="tracking-number">@item.Number</span></span>
+                        <span class="req-status req-status-@item.Status.ToString().ToLowerInvariant()"><i class="bi @StatusText.Icon(item.Status)"></i> @StatusText.Label(item.Status)</span>
+                    </span>
+                </h1>
+            </div>
             <p class="req-title">@item.Title</p>
-            <div class="req-chips">
-                <span><i class="bi bi-calendar3"></i> @item.PeriodStart.ToString("dd MMM yyyy") – @item.PeriodEnd.ToString("dd MMM yyyy")</span>
-                <span><i class="bi bi-person"></i> @item.RequestedByName</span>
+            <div class="req-facts">
+                <div class="req-fact">
+                    <span class="req-fact-label">Period</span>
+                    <span><span class="req-from">From</span> @item.PeriodStart.ToString("dd MMM yyyy") <span class="req-to">To</span> @item.PeriodEnd.ToString("dd MMM yyyy")</span>
+                </div>
+                <div class="req-fact">
+                    <span class="req-fact-label">Created by</span>
+                    <span><i class="bi bi-person"></i> @item.RequestedByName</span>
+                </div>
+                <div class="req-fact">
+                    <span class="req-fact-label">Created</span>
+                    <span><i class="bi bi-clock"></i> @(item.CreatedOn?.ToLocalTime().ToString("dd MMM yyyy, HH:mm") ?? "—")</span>
+                </div>
                 @if (!string.IsNullOrWhiteSpace(item.Department))
                 {
-                    <span><i class="bi bi-building"></i> @item.Department</span>
+                    <div class="req-fact">
+                        <span class="req-fact-label">Department</span>
+                        <span><i class="bi bi-building"></i> @item.Department</span>
+                    </div>
                 }
                 @if (item.BudgetPeriod is not null)
                 {
-                    <a asp-page="/Budgets/Details" asp-route-id="@item.BudgetPeriodId"><i class="bi bi-pie-chart"></i> @item.BudgetPeriod.Name</a>
-                }
-            </div>
-        </div>
-        <div class="req-hero-side">
-            <span class="req-status"><i class="bi bi-flag"></i> @StatusText.Label(item.Status)</span>
-            <div class="d-flex gap-2 flex-wrap justify-content-end">
-                <a class="btn btn-pdf" asp-page-handler="Pdf" asp-route-id="@item.Id"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
-                <a class="btn btn-excel" asp-page-handler="Csv" asp-route-id="@item.Id"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a>
-                @if (item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
-                {
-                    <a class="btn btn-view" asp-page="Edit" asp-route-id="@item.Id"><i class="bi bi-pencil me-1"></i>Edit</a>
-                }
-                @if (item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned)
-                {
-                    <a class="btn btn-primary" asp-page="/Accountability/Edit" asp-route-requisitionId="@item.Id"><i class="bi bi-receipt me-1"></i>Record receipts</a>
-                }
-                @if (Model.CanDecide && item.Status == RequisitionStatus.Submitted)
-                {
-                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#decisionModal"><i class="bi bi-check2-square me-1"></i>Approval decision</button>
+                    <div class="req-fact req-fact-budget">
+                        <span class="req-fact-label">From budget</span>
+                        <a asp-page="/Budgets/Details" asp-route-id="@item.BudgetPeriodId"><i class="bi bi-pie-chart"></i> @item.BudgetPeriod.Name</a>
+                    </div>
                 }
             </div>
         </div>
@@ -54,6 +71,113 @@
     {
         <div class="req-purpose"><i class="bi bi-chat-left-text"></i><span>@item.Purpose</span></div>
     }
+
+    @{
+        var rejected = item.Status == RequisitionStatus.Rejected;
+        var fundsIssued = item.Disbursement is not null;
+        var accountabilityOpen = item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned;
+        var cashStep = item.Status switch
+        {
+            RequisitionStatus.Draft or RequisitionStatus.Returned => 1,
+            RequisitionStatus.Submitted or RequisitionStatus.Rejected => 2,
+            RequisitionStatus.Approved => 3,
+            RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned or RequisitionStatus.AccountabilitySubmitted => 5,
+            RequisitionStatus.Accounted or RequisitionStatus.Closed => 6,
+            _ => 4
+        };
+        string StepClass(int step)
+        {
+            if (rejected && step == 2) return "failed";
+            if (rejected && step > 2) return "wait";
+            if (step < cashStep) return "done";
+            if (step == cashStep && fundsIssued && step < 5) return "done here";
+            if (step == cashStep) return "current";
+            return "wait";
+        }
+        var progress = item.Status switch
+        {
+            RequisitionStatus.Draft => "Created. This requisition is still a draft. Submit it when it is ready for approval.",
+            RequisitionStatus.Returned => "Returned for correction. It is back at Created. Update it, then submit it again. It cannot be approved until it is submitted.",
+            RequisitionStatus.Submitted => "Submitted and pending approval. Funds cannot be issued until an approver records a decision.",
+            RequisitionStatus.Rejected => "Rejected at approval. This requisition stops here and will not be disbursed.",
+            RequisitionStatus.Approved => "Approved and pending disbursement. Issue the funds to move it to Disbursed.",
+            RequisitionStatus.Disbursed => "Pending accountability completion. Account for every item that had money. You can save and come back later. It can be closed only when the accounted total equals the amount issued.",
+            RequisitionStatus.AccountabilityReturned => "Accountability was returned. Finish the remaining items, then close it when the accounted total equals the amount issued.",
+            RequisitionStatus.AccountabilitySubmitted => "Accountability has been submitted and is waiting for review.",
+            RequisitionStatus.Accounted => "Accountability is complete. The accounted total matches the amount issued.",
+            RequisitionStatus.Closed => "This requisition is closed.",
+            _ => "Disbursed. The funds have been issued."
+        };
+    }
+    <div class="req-wizard" aria-label="Requisition progress">
+        <ol class="req-wizard-steps">
+            <li class="@StepClass(1)">
+                <span class="req-wizard-mark">@(StepClass(1).Contains("done") ? "✓" : "1")</span>
+                <span class="req-wizard-name">Created</span>
+                <span class="req-wizard-hint">Requisition saved</span>
+            </li>
+            <li class="@StepClass(2)">
+                <span class="req-wizard-mark">@(StepClass(2) == "failed" ? "!" : StepClass(2).Contains("done") ? "✓" : "2")</span>
+                <span class="req-wizard-name">Submitted</span>
+                <span class="req-wizard-hint">Pending approval</span>
+            </li>
+            <li class="@StepClass(3)">
+                <span class="req-wizard-mark">@(StepClass(3).Contains("done") ? "✓" : "3")</span>
+                <span class="req-wizard-name">Approved</span>
+                <span class="req-wizard-hint">Pending disbursement</span>
+            </li>
+            <li class="@StepClass(4)">
+                <span class="req-wizard-mark">@(StepClass(4).Contains("done") ? "✓" : "4")</span>
+                <span class="req-wizard-name">Disbursed</span>
+                <span class="req-wizard-hint">Funds issued</span>
+            </li>
+            <li class="@StepClass(5)">
+                <span class="req-wizard-mark">@(StepClass(5).Contains("done") ? "✓" : "5")</span>
+                <span class="req-wizard-name">Accountability</span>
+                <span class="req-wizard-hint">Pending completion</span>
+            </li>
+        </ol>
+        <div class="req-wizard-note"><i class="bi bi-signpost-2"></i><span>@progress</span></div>
+        <div class="req-wizard-action">
+            @if (Model.CanSubmit && item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
+            {
+                <form method="post" asp-page-handler="Submit" asp-route-id="@item.Id">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-send me-1"></i>Submit for approval</button>
+                </form>
+            }
+            else if (item.Status == RequisitionStatus.Submitted)
+            {
+                if (Model.CanDecide)
+                {
+                    <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#decisionModal"><i class="bi bi-check2-square me-1"></i>Approval decision</button>
+                }
+                else
+                {
+                    <span class="req-wizard-wait">Waiting for an approver.</span>
+                }
+            }
+            else if (Model.CanDisburse && item.Status == RequisitionStatus.Approved && !fundsIssued)
+            {
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#issueModal"><i class="bi bi-cash-coin me-1"></i>Issue funds</button>
+            }
+            else if (item.Status == RequisitionStatus.Approved && !fundsIssued)
+            {
+                <span class="req-wizard-wait">Waiting for funds to be issued.</span>
+            }
+            else if (accountabilityOpen)
+            {
+                <a class="btn btn-primary" asp-page="/Accountability/Edit" asp-route-requisitionId="@item.Id"><i class="bi bi-receipt me-1"></i>Complete accountability</a>
+            }
+            else if (item.Status == RequisitionStatus.AccountabilitySubmitted)
+            {
+                <span class="req-wizard-wait">Waiting for the accountability to be reviewed.</span>
+            }
+            @if (fundsIssued)
+            {
+                <a class="btn btn-view" asp-page="/Accountability/Details" asp-route-requisitionId="@item.Id"><i class="bi bi-eye me-1"></i>View accountability</a>
+            }
+        </div>
+    </div>
 
     <div class="req-summary">
         <div class="stat-card req-stat">
@@ -101,51 +225,58 @@
         </div>
     </div>
 
-    @if (Model.CanSubmit && item.Status is RequisitionStatus.Draft or RequisitionStatus.Returned)
-    {
-        <form method="post" asp-page-handler="Submit" class="mb-4">
-            <button class="btn btn-primary" type="submit">Submit for approval</button>
-        </form>
-    }
-
-    @if (item.Decisions.Count > 0)
-    {
-        <div class="req-section">
-        <div class="req-section-title"><i class="bi bi-clock-history"></i> Approval history</div>
-        <ul class="req-timeline">
-            @foreach (var decision in item.Decisions.OrderByDescending(d => d.CreatedOn))
-            {
-                var icon = decision.Action switch
-                {
-                    ApprovalAction.Approve => "bi-check-circle-fill",
-                    ApprovalAction.Reject => "bi-x-circle-fill",
-                    _ => "bi-arrow-return-left"
-                };
-                <li>
-                    <i class="bi @icon"></i>
-                    <div>
-                        <strong>@decision.Action</strong> by @decision.DecidedByName
-                        @if (decision.Action == ApprovalAction.Approve)
-                        {
-                            <span class="req-amount"> · @Money.FormatPair(decision.ApprovedUgx, decision.ApprovedUsd)</span>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(decision.Comments))
-                        {
-                            <div class="text-muted">@decision.Comments</div>
-                        }
-                    </div>
-                </li>
-            }
-        </ul>
+    <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content history-sheet">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="historyModalTitle"><i class="bi bi-clock-history me-2"></i>Approval history</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if (item.Decisions.Count == 0)
+                    {
+                        <p class="text-muted mb-0">No approval decisions yet.</p>
+                    }
+                    else
+                    {
+                        <ul class="req-timeline mb-0">
+                            @foreach (var decision in item.Decisions.OrderByDescending(d => d.CreatedOn))
+                            {
+                                var icon = decision.Action switch
+                                {
+                                    ApprovalAction.Approve => "bi-check-circle-fill",
+                                    ApprovalAction.Reject => "bi-x-circle-fill",
+                                    _ => "bi-arrow-return-left"
+                                };
+                                <li>
+                                    <i class="bi @icon"></i>
+                                    <div>
+                                        <strong>@decision.Action</strong> by @decision.DecidedByName
+                                        <div class="text-muted small">@(decision.CreatedOn?.ToLocalTime().ToString("dd MMM yyyy, HH:mm") ?? "—")</div>
+                                        @if (decision.Action == ApprovalAction.Approve)
+                                        {
+                                            <div class="req-amount">@Money.FormatPair(decision.ApprovedUgx, decision.ApprovedUsd)</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(decision.Comments))
+                                        {
+                                            <div>@decision.Comments</div>
+                                        }
+                                    </div>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            </div>
         </div>
-    }
+    </div>
 
     @if (Model.CanDecide && item.Status == RequisitionStatus.Submitted)
     {
         <div class="modal fade" id="decisionModal" tabindex="-1" aria-labelledby="decisionModalTitle" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content">
-                    <form method="post" asp-page-handler="Decide">
+                    <form method="post" asp-page-handler="Decide" asp-route-id="@item.Id">
                         <div class="modal-header">
                             <h2 class="modal-title h5" id="decisionModalTitle"><i class="bi bi-check2-square me-2"></i>Approval decision</h2>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -186,25 +317,40 @@
 
     @if (Model.CanDisburse && item.Status == RequisitionStatus.Approved && item.Disbursement is null)
     {
-        <div class="req-section">
-            <div class="req-section-title"><i class="bi bi-cash-coin"></i> Issue funds</div>
-            <form method="post" asp-page-handler="Disburse" class="row g-3 p-3">
-                    <div class="col-md-3"><label class="form-label">UGX</label><input class="form-control text-end amount-input" data-currency="UGX" name="Disbursement.AmountUgx" value="@Money.FormatNumber(Model.Disbursement.AmountUgx, Money.Ugx)" inputmode="decimal" /></div>
-                    <div class="col-md-3"><label class="form-label">USD</label><input class="form-control text-end amount-input" data-currency="USD" name="Disbursement.AmountUsd" value="@Money.FormatNumber(Model.Disbursement.AmountUsd, Money.Usd)" inputmode="decimal" /></div>
-                    <div class="col-md-3">
-                        <label class="form-label">Method</label>
-                        <select class="form-select" asp-for="Disbursement.Method">
-                            <option>Cash</option>
-                            <option>Bank</option>
-                            <option>Mobile money</option>
-                            <option>Cheque</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label">Date</label><input class="form-control" asp-for="Disbursement.PaidOn" type="date" /></div>
-                    <div class="col-md-6"><label class="form-label">Reference</label><input class="form-control" asp-for="Disbursement.Reference" /></div>
-                    <div class="col-md-6"><label class="form-label">Notes</label><input class="form-control" asp-for="Disbursement.Notes" /></div>
-                    <div class="col-12"><button class="btn btn-primary" type="submit">Record disbursement</button></div>
-            </form>
+        <div class="modal fade" id="issueModal" tabindex="-1" aria-labelledby="issueModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <form method="post" asp-page-handler="Disburse" asp-route-id="@item.Id">
+                        <div class="modal-header">
+                            <h2 class="modal-title h5" id="issueModalTitle"><i class="bi bi-cash-coin me-2"></i>Issue funds</h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted">This requisition is approved and waiting for disbursement. Recording the issue moves it to Disbursed.</p>
+                            <div class="row g-3">
+                                <div class="col-md-6"><label class="form-label">UGX</label><input class="form-control text-end amount-input" data-currency="UGX" name="Disbursement.AmountUgx" value="@Money.FormatNumber(Model.Disbursement.AmountUgx, Money.Ugx)" inputmode="decimal" /></div>
+                                <div class="col-md-6"><label class="form-label">USD</label><input class="form-control text-end amount-input" data-currency="USD" name="Disbursement.AmountUsd" value="@Money.FormatNumber(Model.Disbursement.AmountUsd, Money.Usd)" inputmode="decimal" /></div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Method</label>
+                                    <select class="form-select" asp-for="Disbursement.Method">
+                                        <option>Cash</option>
+                                        <option>Bank</option>
+                                        <option>Mobile money</option>
+                                        <option>Cheque</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6"><label class="form-label">Date</label><input class="form-control" asp-for="Disbursement.PaidOn" type="date" /></div>
+                                <div class="col-md-6"><label class="form-label">Reference</label><input class="form-control" asp-for="Disbursement.Reference" /></div>
+                                <div class="col-md-6"><label class="form-label">Notes</label><input class="form-control" asp-for="Disbursement.Notes" /></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cancel</button>
+                            <button class="btn btn-primary" type="submit">Record disbursement</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     }
 
@@ -232,7 +378,7 @@
                 @foreach (var line in item.Accountability.Lines.OrderBy(l => l.LineNumber))
                 {
                     <tr>
-                        <td>@line.SpentOn.ToString("dd MMM yyyy")</td>
+                        <td>@(line.SpentOn?.ToString("dd MMM yyyy") ?? "—")</td>
                         <td>@line.Description</td>
                         <td>@line.ReceiptNumber</td>
                         <td class="num">@Money.Format(line.Amount, line.Currency)</td>
@@ -256,7 +402,7 @@
 
     @if (Model.CanReview && item.Accountability?.Status == AccountabilityStatus.Submitted)
     {
-        <form method="post" asp-page-handler="Review" class="req-section p-3">
+        <form method="post" asp-page-handler="Review" asp-route-id="@item.Id" class="req-section p-3">
             <label class="form-label">Accountability review</label>
             <textarea class="form-control mb-2" asp-for="ReviewComments" rows="2" placeholder="Required when the receipts do not match the cash issued, or when returning the accountability."></textarea>
             <div class="d-flex gap-2">
@@ -268,7 +414,7 @@
 
     @if (Model.CanClose && item.Status == RequisitionStatus.Accounted)
     {
-        <form method="post" asp-page-handler="Close">
+        <form method="post" asp-page-handler="Close" asp-route-id="@item.Id">
             <button class="btn btn-primary" type="submit">Close requisition</button>
         </form>
     }

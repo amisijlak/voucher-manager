@@ -169,13 +169,19 @@ public class AccountabilityLine : BaseEntity
     public Accountability Accountability { get; set; } = default!;
 
     public int LineNumber { get; set; }
-    public DateOnly SpentOn { get; set; }
+
+    public int? RequisitionLineId { get; set; }
+
+    public DateOnly? SpentOn { get; set; }
 
     [Required, MaxLength(400)]
     public string Description { get; set; } = string.Empty;
 
     [MaxLength(80)]
     public string? ReceiptNumber { get; set; }
+
+    [MaxLength(500)]
+    public string? Comment { get; set; }
 
     [Column(TypeName = "decimal(18,2)")]
     public decimal Amount { get; set; }

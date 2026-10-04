@@ -36,21 +36,7 @@ public class EditModel : PageModel
         }
 
         Input.Notes = Item!.Accountability?.Notes;
-        Input.Lines = Item.Accountability?.Lines.OrderBy(l => l.LineNumber).Select(l => new AccountabilityLineInput
-        {
-            SpentOn = l.SpentOn,
-            Description = l.Description,
-            ReceiptNumber = l.ReceiptNumber,
-            Amount = l.Amount,
-            Currency = l.Currency,
-            ExistingPath = l.ReceiptFilePath,
-            ExistingName = l.ReceiptFileName
-        }).ToList() ?? [];
-        if (Input.Lines.Count == 0)
-        {
-            Input.Lines.Add(new AccountabilityLineInput { SpentOn = DateOnly.FromDateTime(DateTime.Today) });
-        }
-
+        Input.Lines = BuildLines(Item);
         return Page();
     }
 
@@ -103,9 +89,11 @@ public class EditModel : PageModel
 
             drafts.Add(new AccountabilityLineDraft
             {
+                RequisitionLineId = line.RequisitionLineId,
                 SpentOn = line.SpentOn,
                 Description = line.Description,
                 ReceiptNumber = line.ReceiptNumber,
+                Comment = line.Comment,
                 Amount = line.Amount,
                 Currency = line.Currency,
                 ReceiptFilePath = path,
@@ -139,6 +127,7 @@ public class EditModel : PageModel
     {
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         Item = await _repository.Set<Requisition>()
+            .Include(r => r.Lines)
             .Include(r => r.Disbursement)
             .Include(r => r.Accountability)!.ThenInclude(a => a!.Lines)
             .FirstOrDefaultAsync(r => r.Id == requisitionId && r.OrganizationId == organization.Id, cancellationToken);
@@ -177,11 +166,56 @@ public class EditModel : PageModel
         public List<AccountabilityLineInput> Lines { get; set; } = [];
     }
 
+    private static List<AccountabilityLineInput> BuildLines(Requisition item)
+    {
+        var required = item.Lines.Where(l => l.Amount > 0).OrderBy(l => l.LineNumber).ToList();
+        var existing = item.Accountability?.Lines.OrderBy(l => l.LineNumber).ToList() ?? [];
+        var lines = new List<AccountabilityLineInput>();
+        foreach (var source in required)
+        {
+            var match = existing.FirstOrDefault(l => l.RequisitionLineId == source.Id);
+            lines.Add(match is null
+                ? new AccountabilityLineInput
+                {
+                    RequisitionLineId = source.Id,
+                    Description = source.Description,
+                    Amount = source.Amount,
+                    Currency = source.Currency
+                }
+                : MapLine(match));
+        }
+
+        lines.AddRange(existing
+            .Where(l => l.RequisitionLineId is null || required.All(source => source.Id != l.RequisitionLineId))
+            .Select(l =>
+            {
+                var mapped = MapLine(l);
+                mapped.RequisitionLineId = null;
+                return mapped;
+            }));
+        return lines;
+    }
+
+    private static AccountabilityLineInput MapLine(AccountabilityLine line) => new()
+    {
+        RequisitionLineId = line.RequisitionLineId,
+        SpentOn = line.SpentOn,
+        Description = line.Description,
+        ReceiptNumber = line.ReceiptNumber,
+        Comment = line.Comment,
+        Amount = line.Amount,
+        Currency = line.Currency,
+        ExistingPath = line.ReceiptFilePath,
+        ExistingName = line.ReceiptFileName
+    };
+
     public sealed class AccountabilityLineInput
     {
-        public DateOnly SpentOn { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public int? RequisitionLineId { get; set; }
+        public DateOnly? SpentOn { get; set; }
         public string Description { get; set; } = string.Empty;
         public string? ReceiptNumber { get; set; }
+        public string? Comment { get; set; }
         public decimal Amount { get; set; }
         public string Currency { get; set; } = Money.Ugx;
         public string? ExistingPath { get; set; }

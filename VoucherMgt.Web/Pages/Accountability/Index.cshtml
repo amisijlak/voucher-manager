@@ -28,7 +28,8 @@
                     <td>@item.Title</td>
                     <td>@Money.FormatPair(item.Disbursement?.AmountUgx ?? 0, item.Disbursement?.AmountUsd ?? 0)</td>
                     <td><span class="badge @StatusText.Badge(item.Status)">@StatusText.Label(item.Status)</span></td>
-                    <td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-view" asp-page="Details" asp-route-requisitionId="@item.Id">View</a>
                         @if (item.Status is RequisitionStatus.Disbursed or RequisitionStatus.AccountabilityReturned)
                         {
                             <a class="btn btn-sm btn-primary" asp-page="Edit" asp-route-requisitionId="@item.Id">Enter receipts</a>

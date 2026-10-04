@@ -196,6 +196,10 @@ public class VoucherMgtDbContext : IdentityDbContext<ApplicationUser>
                 .WithMany(a => a.Lines)
                 .HasForeignKey(l => l.AccountabilityId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<RequisitionLine>()
+                .WithMany()
+                .HasForeignKey(l => l.RequisitionLineId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<OrderForm>(entity =>

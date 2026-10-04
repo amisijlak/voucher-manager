@@ -257,6 +257,7 @@ public sealed class PettyCashService : IPettyCashService
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         var requisition = await OwnedRequisition(id, organization.Id)
             .Include(r => r.Disbursement)
+            .Include(r => r.Lines)
             .FirstOrDefaultAsync(cancellationToken);
         if (requisition is null)
         {
@@ -291,7 +292,21 @@ public sealed class PettyCashService : IPettyCashService
             PaidByName = actor.Name,
             Notes = Clean(draft.Notes)
         };
-        requisition.Accountability = new Accountability { Status = AccountabilityStatus.Draft };
+        var accountability = new Accountability { Status = AccountabilityStatus.Draft };
+        var lineNumber = 1;
+        foreach (var line in requisition.Lines.Where(l => l.Amount > 0).OrderBy(l => l.LineNumber))
+        {
+            accountability.Lines.Add(new AccountabilityLine
+            {
+                LineNumber = lineNumber++,
+                RequisitionLineId = line.Id,
+                Description = line.Description,
+                Amount = line.Amount,
+                Currency = line.Currency
+            });
+        }
+
+        requisition.Accountability = accountability;
         requisition.Status = RequisitionStatus.Disbursed;
         await _repository.SaveChangesAsync(cancellationToken);
         return WorkflowResult.Success($"Funds for {requisition.Number} were recorded. Accountability is now open.", requisition.Id);
@@ -299,16 +314,17 @@ public sealed class PettyCashService : IPettyCashService
 
     public async Task<WorkflowResult> SaveAccountabilityAsync(int requisitionId, AccountabilityDraft draft, Actor actor, CancellationToken cancellationToken = default)
     {
-        var accountability = await LoadEditableAccountability(requisitionId, cancellationToken);
-        if (accountability is null)
+        var requisition = await LoadEditableRequisition(requisitionId, cancellationToken);
+        var accountability = requisition?.Accountability;
+        if (requisition is null || accountability is null || requisition.Disbursement is null)
         {
             return WorkflowResult.Fail("Accountability can be edited only after funds are issued, and before it is approved.");
         }
 
-        var lines = NormalizeAccountability(draft.Lines);
-        if (lines.Count == 0)
+        var prepared = PrepareAccountabilityLines(requisition, draft.Lines);
+        if (prepared.Error is not null)
         {
-            return WorkflowResult.Fail("Add the receipts or items that show how the money was used.");
+            return WorkflowResult.Fail(prepared.Error);
         }
 
         foreach (var existing in accountability.Lines.ToList())
@@ -318,15 +334,17 @@ public sealed class PettyCashService : IPettyCashService
 
         accountability.Lines.Clear();
         accountability.Notes = Clean(draft.Notes);
-        for (var index = 0; index < lines.Count; index++)
+        for (var index = 0; index < prepared.Lines.Count; index++)
         {
-            var line = lines[index];
+            var line = prepared.Lines[index];
             accountability.Lines.Add(new AccountabilityLine
             {
                 LineNumber = index + 1,
+                RequisitionLineId = line.RequisitionLineId,
                 SpentOn = line.SpentOn,
                 Description = line.Description.Trim(),
                 ReceiptNumber = Clean(line.ReceiptNumber),
+                Comment = Clean(line.Comment),
                 Amount = Money.Round(line.Amount, line.Currency),
                 Currency = Money.Normalize(line.Currency),
                 ReceiptFilePath = line.ReceiptFilePath,
@@ -342,6 +360,7 @@ public sealed class PettyCashService : IPettyCashService
     {
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         var requisition = await OwnedRequisition(requisitionId, organization.Id)
+            .Include(r => r.Lines)
             .Include(r => r.Accountability)!.ThenInclude(a => a!.Lines)
             .Include(r => r.Disbursement)
             .FirstOrDefaultAsync(cancellationToken);
@@ -355,9 +374,10 @@ public sealed class PettyCashService : IPettyCashService
             return WorkflowResult.Fail("This accountability has already been submitted.");
         }
 
-        if (requisition.Accountability.Lines.Count == 0)
+        var unfinished = AccountabilityGap(requisition);
+        if (unfinished is not null)
         {
-            return WorkflowResult.Fail("Add receipt lines before submitting accountability.");
+            return WorkflowResult.Fail(unfinished);
         }
 
         requisition.Accountability.Status = AccountabilityStatus.Submitted;
@@ -372,6 +392,7 @@ public sealed class PettyCashService : IPettyCashService
     {
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         var requisition = await OwnedRequisition(requisitionId, organization.Id)
+            .Include(r => r.Lines)
             .Include(r => r.Accountability)!.ThenInclude(a => a!.Lines)
             .Include(r => r.Disbursement)
             .FirstOrDefaultAsync(cancellationToken);
@@ -380,14 +401,17 @@ public sealed class PettyCashService : IPettyCashService
             return WorkflowResult.Fail("Only a submitted accountability can be reviewed.");
         }
 
-        var spentUgx = requisition.Accountability.Lines.Where(l => l.Currency == Money.Ugx).Sum(l => l.Amount);
-        var spentUsd = requisition.Accountability.Lines.Where(l => l.Currency == Money.Usd).Sum(l => l.Amount);
-        var variance = spentUgx != requisition.Disbursement.AmountUgx || spentUsd != requisition.Disbursement.AmountUsd;
-        if ((variance || !approve) && string.IsNullOrWhiteSpace(comments))
+        if (approve)
         {
-            return WorkflowResult.Fail(approve
-                ? "The receipts do not match the amount issued. Explain how the difference is being cleared."
-                : "Explain what must be corrected before accountability can be accepted.");
+            var unfinished = AccountabilityGap(requisition);
+            if (unfinished is not null)
+            {
+                return WorkflowResult.Fail(unfinished);
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(comments))
+        {
+            return WorkflowResult.Fail("Explain what must be corrected before accountability can be accepted.");
         }
 
         requisition.Accountability.ReviewComments = Clean(comments);
@@ -520,13 +544,15 @@ public sealed class PettyCashService : IPettyCashService
         };
     }
 
-    private async Task<Accountability?> LoadEditableAccountability(int requisitionId, CancellationToken cancellationToken)
+    private async Task<Requisition?> LoadEditableRequisition(int requisitionId, CancellationToken cancellationToken)
     {
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         var requisition = await OwnedRequisition(requisitionId, organization.Id)
+            .Include(r => r.Lines)
+            .Include(r => r.Disbursement)
             .Include(r => r.Accountability)!.ThenInclude(a => a!.Lines)
             .FirstOrDefaultAsync(cancellationToken);
-        if (requisition?.Accountability is null)
+        if (requisition?.Accountability is null || requisition.Disbursement is null)
         {
             return null;
         }
@@ -537,8 +563,82 @@ public sealed class PettyCashService : IPettyCashService
         }
 
         return requisition.Accountability.Status is AccountabilityStatus.Draft or AccountabilityStatus.Returned
-            ? requisition.Accountability
+            ? requisition
             : null;
+    }
+
+    private static (List<AccountabilityLineDraft> Lines, string? Error) PrepareAccountabilityLines(Requisition requisition, IEnumerable<AccountabilityLineDraft> drafts)
+    {
+        var required = requisition.Lines.Where(l => l.Amount > 0).OrderBy(l => l.LineNumber).ToList();
+        var posted = drafts.ToList();
+        var lines = new List<AccountabilityLineDraft>();
+        foreach (var source in required)
+        {
+            var match = posted.FirstOrDefault(l => l.RequisitionLineId == source.Id);
+            if (match is null)
+            {
+                return ([], "Each requisition item that had money must stay on the accountability. You can add items, but you cannot remove those.");
+            }
+
+            lines.Add(new AccountabilityLineDraft
+            {
+                RequisitionLineId = source.Id,
+                SpentOn = match.SpentOn,
+                Description = source.Description,
+                ReceiptNumber = match.ReceiptNumber,
+                Comment = match.Comment,
+                Amount = match.Amount < 0 ? 0 : match.Amount,
+                Currency = source.Currency,
+                ReceiptFilePath = match.ReceiptFilePath,
+                ReceiptFileName = match.ReceiptFileName
+            });
+        }
+
+        foreach (var extra in posted.Where(l => l.RequisitionLineId is null && !string.IsNullOrWhiteSpace(l.Description) && l.Amount > 0))
+        {
+            lines.Add(extra);
+        }
+
+        if (!lines.Any(IsDraftAccounted))
+        {
+            return ([], "Save once at least one item is accounted. Select its date and add a receipt number, a comment, or a proof file.");
+        }
+
+        return (lines, null);
+    }
+
+    private static string? AccountabilityGap(Requisition requisition)
+    {
+        var lines = requisition.Accountability?.Lines ?? [];
+        var required = requisition.Lines.Where(l => l.Amount > 0).ToList();
+        if (required.Any(source => !lines.Any(l => l.RequisitionLineId == source.Id)))
+        {
+            return "Each requisition item that had money must stay on the accountability before it can be closed.";
+        }
+
+        foreach (var source in required)
+        {
+            var line = lines.First(l => l.RequisitionLineId == source.Id);
+            if (line.SpentOn is null || !HasItemProof(line))
+            {
+                return "Each item is accounted only when its date is selected and it has a receipt number, a comment, or a proof file.";
+            }
+
+            var disbursed = source.Currency == Money.Usd ? requisition.Disbursement!.AmountUsd : requisition.Disbursement!.AmountUgx;
+            if (disbursed > 0 && line.Amount <= 0)
+            {
+                return "Account for every requisition item that had money. Save your progress and finish the remaining items later.";
+            }
+        }
+
+        var spentUgx = lines.Where(l => l.Currency == Money.Ugx).Sum(l => l.Amount);
+        var spentUsd = lines.Where(l => l.Currency == Money.Usd).Sum(l => l.Amount);
+        if (spentUgx != requisition.Disbursement!.AmountUgx || spentUsd != requisition.Disbursement.AmountUsd)
+        {
+            return "Accountability can be closed only when the accounted total equals the amount issued on this requisition.";
+        }
+
+        return null;
     }
 
     private IQueryable<Requisition> OwnedRequisition(int id, int organizationId) =>
@@ -593,8 +693,16 @@ public sealed class PettyCashService : IPettyCashService
         return lines;
     }
 
-    private static List<AccountabilityLineDraft> NormalizeAccountability(IEnumerable<AccountabilityLineDraft> drafts) =>
-        drafts.Where(l => !string.IsNullOrWhiteSpace(l.Description) && l.Amount > 0).ToList();
+    private static bool IsDraftAccounted(AccountabilityLineDraft line) =>
+        line.SpentOn is not null
+        && (!string.IsNullOrWhiteSpace(line.ReceiptNumber)
+            || !string.IsNullOrWhiteSpace(line.Comment)
+            || !string.IsNullOrWhiteSpace(line.ReceiptFileName));
+
+    private static bool HasItemProof(AccountabilityLine line) =>
+        !string.IsNullOrWhiteSpace(line.ReceiptNumber)
+        || !string.IsNullOrWhiteSpace(line.Comment)
+        || !string.IsNullOrWhiteSpace(line.ReceiptFileName);
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

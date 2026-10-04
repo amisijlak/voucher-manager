@@ -4,9 +4,6 @@
 @{
     Layout = null;
     var order = Model.Item!;
-    var agreement = order.Direction == OrderDirection.Purchase
-        ? "Please supply the following goods / services to"
-        : "I/We hereby agree to do business with";
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -17,9 +14,15 @@
     <style>
         body { background: #fff; color: #1c2430; font-family: "Times New Roman", Times, serif; }
         .sheet { max-width: 900px; margin: 24px auto; padding: 28px; border: 1px solid #c5ccd6; }
-        .companies { display: flex; justify-content: space-between; gap: 12px; text-align: center; font-weight: 700; letter-spacing: .04em; }
-        .companies span { flex: 1; border-bottom: 2px solid #1b3a4b; padding-bottom: 6px; }
-        h1 { text-align: center; letter-spacing: .18em; font-size: 1.6rem; margin: 18px 0; }
+        .companies { display: flex; align-items: stretch; gap: 0; }
+        .company { flex: 1; text-align: center; padding: 8px 14px 4px; position: relative; }
+        .company:not(:last-child)::after { content: ""; position: absolute; top: 16px; bottom: 10px; right: 0; width: 1px; background: #c4a35a; }
+        .company img { max-height: 74px; max-width: 170px; object-fit: contain; }
+        .mark { height: 80px; display: flex; align-items: center; justify-content: center; font-weight: 700; letter-spacing: .06em; font-size: .75rem; }
+        .company strong { display: block; margin-top: 6px; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
+        .company strong::before { content: ""; display: block; width: 32px; height: 2px; margin: 0 auto 8px; background: #c4a35a; }
+        .company em { display: block; margin-top: 4px; font-style: normal; font-size: .8rem; color: #3c4043; }
+        h1 { text-align: center; letter-spacing: .28em; font-size: 1.45rem; margin: 16px 0 18px; text-transform: uppercase; }
         .field { display: flex; gap: 8px; margin-bottom: 6px; }
         .field b { min-width: 130px; }
         .field span { flex: 1; border-bottom: 1px dotted #667; }
@@ -31,8 +34,8 @@
         .sign { display: flex; gap: 24px; margin-top: 28px; }
         .sign div { flex: 1; }
         .line { border-bottom: 1px solid #111; height: 28px; }
-        .copies, .official { border: 1px solid #111; padding: 8px 12px; margin-top: 18px; }
-        .official { float: right; width: 280px; }
+        .agree { margin: 14px 0 4px; }
+        .agree span { margin-left: 14px; font-style: italic; font-weight: 700; color: #6b4a12; }
         @@media print { .sheet { border: 0; margin: 0; } .no-print { display: none; } }
     </style>
 </head>
@@ -42,73 +45,65 @@
         <div class="companies">
             @foreach (var company in Model.Companies)
             {
-                <span>@company.ShortName.ToUpperInvariant()</span>
+                <div class="company">
+                    <div class="mark">
+                        @if (company.LogoFilePath is not null)
+                        {
+                            <img src="@Url.Page(null, "Logo", new { companyId = company.Id })" alt="" />
+                        }
+                        else
+                        {
+                            <span>@company.ShortName</span>
+                        }
+                    </div>
+                    <strong>@company.Name</strong>
+                    @if (!string.IsNullOrWhiteSpace(company.Contact))
+                    {
+                        <em>@company.Contact</em>
+                    }
+                </div>
             }
         </div>
-        <div class="text-center small mt-1">@string.Join("  |  ", Model.Companies.Select(c => c.Name))</div>
         <h1>ORDER FORM</h1>
         <div class="text-end mb-2"><strong>No.</strong> @order.Number</div>
         <div class="field"><b>Client name</b><span>@order.PartyName</span></div>
         <div class="field"><b>Contact name</b><span>@order.ContactName</span></div>
         <div class="field"><b>Invoice name</b><span>@order.InvoiceName</span></div>
-        <div class="field"><b>Address</b><span>@order.Address</span><b style="min-width:90px">City / town</b><span>@order.CityTown</span><b style="min-width:70px">Country</b><span>@order.Country</span></div>
+        <div class="field"><b>Address</b><span>@order.Address</span></div>
+        <div class="field"><b>City / town</b><span>@order.CityTown</span><b style="min-width:80px">Country</b><span>@order.Country</span></div>
         <div class="field"><b>Phone</b><span>@order.Phone</span><b style="min-width:50px">Fax</b><span>@order.Fax</span></div>
-        <div class="field"><b>E-mail address</b><span>@order.Email</span></div>
-        <p class="mt-3 mb-1">@agreement:</p>
+        <div class="field"><b>Email address</b><span>@order.Email</span></div>
+        <p class="agree">I/We hereby agree to do business with <span>All payments should be made to respective company accounts</span></p>
         <div class="checks">
             @foreach (var company in Model.Companies)
             {
                 <div><span class="box">@(company.Id == order.TradingCompanyId ? "✓" : "")</span>@company.Name</div>
             }
         </div>
-        @if (order.Kind == OrderKind.Advertising && !string.IsNullOrWhiteSpace(order.Channel))
-        {
-            <p>Station / channel: <strong>@order.Channel</strong></p>
-        }
         <table>
             <thead>
                 <tr>
-                    @if (order.Kind == OrderKind.Advertising)
-                    {
-                        <th>Time / programme</th>
-                        <th>Length (seconds)</th>
-                        <th>No. of insertions</th>
-                        <th>Rate</th>
-                        <th>Amount</th>
-                    }
-                    else
-                    {
-                        <th>Quantity</th>
-                        <th>Description</th>
-                        <th>Unit price</th>
-                        <th>Amount</th>
-                    }
+                    <th>Quantity</th>
+                    <th>Description</th>
+                    <th>Unit price</th>
+                    <th>Currency</th>
+                    <th>Amount</th>
                 </tr>
             </thead>
             <tbody>
             @foreach (var line in order.Lines.OrderBy(l => l.LineNumber))
             {
                 <tr>
-                    @if (order.Kind == OrderKind.Advertising)
-                    {
-                        <td>@(line.Programme ?? line.Description)</td>
-                        <td>@line.LengthSeconds</td>
-                        <td>@(line.Insertions ?? (int)line.Quantity)</td>
-                        <td>@Money.Format(line.UnitPrice, line.Currency)</td>
-                        <td>@Money.Format(line.Amount, line.Currency)</td>
-                    }
-                    else
-                    {
-                        <td>@line.Quantity.ToString("0.##")</td>
-                        <td>@line.Description</td>
-                        <td>@Money.Format(line.UnitPrice, line.Currency)</td>
-                        <td>@Money.Format(line.Amount, line.Currency)</td>
-                    }
+                    <td>@line.Quantity.ToString("0.##")</td>
+                    <td>@line.Description</td>
+                    <td>@Money.FormatNumber(line.UnitPrice, line.Currency)</td>
+                    <td>@line.Currency</td>
+                    <td>@Money.Format(line.Amount, line.Currency)</td>
                 </tr>
             }
             @for (var i = order.Lines.Count; i < 6; i++)
             {
-                <tr><td>&nbsp;</td><td></td><td></td><td></td>@if (order.Kind == OrderKind.Advertising) { <td></td> }</tr>
+                <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>
             }
             </tbody>
         </table>
@@ -117,34 +112,24 @@
             <tr><th>VAT @order.VatRate.ToString("0.##")%</th><td>@Money.FormatPair(order.VatUgx, order.VatUsd)</td></tr>
             <tr><th>Gross total</th><td><strong>@Money.FormatPair(order.GrossUgx, order.GrossUsd)</strong></td></tr>
         </table>
-        <p class="mt-3">@order.PaymentNote</p>
         <div class="sign">
-            <div>
-                <div>Business manager</div>
-                <div class="line">@order.BusinessManager</div>
-                <div class="mt-3">Business supervisor</div>
-                <div class="line">@order.BusinessSupervisor</div>
-            </div>
             <div>
                 <div>Client's signature</div>
                 <div class="line"></div>
-                <div class="mt-2">Name in full: @order.ClientSignatoryName</div>
-                <div>Designation: @order.ClientDesignation</div>
-                <div>Date: @(order.ClientSignedOn?.ToString("dd MMM yyyy"))</div>
+                <div class="mt-3">Name in full</div>
+                <div class="line"></div>
+                <div class="mt-3">Designation</div>
+                <div class="line"></div>
+                <div class="mt-3">Date</div>
+                <div class="line"></div>
+            </div>
+            <div>
+                <div>Business manager</div>
+                <div class="line"></div>
+                <div class="mt-3">Business sponsor</div>
+                <div class="line"></div>
             </div>
         </div>
-        <div class="official">
-            <strong>For official use only</strong>
-            <div>Account no: @order.AccountNumber</div>
-            <div>Credit control: @order.CreditControl</div>
-        </div>
-        <div class="copies" style="width:320px;">
-            <div>Client's copy (white)</div>
-            <div>Credit control section (yellow)</div>
-            <div>Company copy (blue)</div>
-        </div>
-        <div style="clear:both"></div>
-        <p class="small mt-4 mb-0">Acceptance of this order confirms the quantities, prices, and VAT treatment stated above. Cancellations must be in writing.</p>
     </div>
 </body>
 </html>

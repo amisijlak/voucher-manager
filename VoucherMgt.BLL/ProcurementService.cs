@@ -34,9 +34,7 @@ public sealed class ProcurementService : IProcurementService
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(draft.PartyName))
         {
-            return WorkflowResult.Fail(draft.Direction == OrderDirection.Purchase
-                ? "Enter the supplier name."
-                : "Enter the client name.");
+            return WorkflowResult.Fail("Enter the client name.");
         }
 
         var company = await _repository.Set<TradingCompany>()
@@ -46,20 +44,10 @@ public sealed class ProcurementService : IProcurementService
             return WorkflowResult.Fail("Select the company this order belongs to.");
         }
 
-        var lines = BuildOrderLines(draft.Lines, draft.Kind);
+        var lines = BuildOrderLines(draft.Lines, OrderKind.General);
         if (lines.Count == 0)
         {
             return WorkflowResult.Fail("Add at least one order line.");
-        }
-
-        if (draft.RequisitionId is int requisitionId)
-        {
-            var exists = await _repository.Set<Requisition>()
-                .AnyAsync(r => r.Id == requisitionId && r.OrganizationId == organization.Id, cancellationToken);
-            if (!exists)
-            {
-                return WorkflowResult.Fail("The linked requisition was not found.");
-            }
         }
 
         OrderForm order;
@@ -92,10 +80,9 @@ public sealed class ProcurementService : IProcurementService
             _repository.Add(order);
         }
 
-        order.Kind = draft.Kind;
-        order.Direction = draft.Direction;
+        order.Kind = OrderKind.General;
+        order.Direction = OrderDirection.ClientOrder;
         order.TradingCompanyId = company.Id;
-        order.RequisitionId = draft.RequisitionId;
         order.PartyName = draft.PartyName.Trim();
         order.ContactName = Clean(draft.ContactName);
         order.InvoiceName = Clean(draft.InvoiceName);
@@ -105,17 +92,9 @@ public sealed class ProcurementService : IProcurementService
         order.Phone = Clean(draft.Phone);
         order.Fax = Clean(draft.Fax);
         order.Email = Clean(draft.Email);
-        order.Channel = Clean(draft.Channel);
-        order.VatMode = draft.VatMode;
-        order.VatRate = draft.VatMode == VatMode.Exempt ? 0 : draft.VatRate;
-        order.PaymentNote = Clean(draft.PaymentNote) ?? organization.PaymentNote;
-        order.ClientSignatoryName = Clean(draft.ClientSignatoryName);
-        order.ClientDesignation = Clean(draft.ClientDesignation);
-        order.ClientSignedOn = draft.ClientSignedOn;
-        order.BusinessManager = Clean(draft.BusinessManager);
-        order.BusinessSupervisor = Clean(draft.BusinessSupervisor);
-        order.AccountNumber = Clean(draft.AccountNumber) ?? company.AccountNumber;
-        order.CreditControl = Clean(draft.CreditControl);
+        order.VatMode = VatMode.Exclusive;
+        order.VatRate = organization.DefaultVatRate;
+        order.PaymentNote = "All payments should be made to respective company accounts.";
         foreach (var line in lines)
         {
             order.Lines.Add(line);

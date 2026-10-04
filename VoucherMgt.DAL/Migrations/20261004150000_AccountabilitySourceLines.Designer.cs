@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VoucherMgt.DAL;
 
@@ -11,9 +12,10 @@ using VoucherMgt.DAL;
 namespace VoucherMgt.DAL.Migrations
 {
     [DbContext(typeof(VoucherMgtDbContext))]
-    partial class VoucherMgtDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004150000_AccountabilitySourceLines")]
+    partial class AccountabilitySourceLines
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -220,10 +222,6 @@ namespace VoucherMgt.DAL.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<string>("Comment")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
                     b.Property<DateTimeOffset?>("CreatedOn")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("CreatedOn");
@@ -260,7 +258,7 @@ namespace VoucherMgt.DAL.Migrations
                     b.Property<int?>("RequisitionLineId")
                         .HasColumnType("int");
 
-                    b.Property<DateOnly?>("SpentOn")
+                    b.Property<DateOnly>("SpentOn")
                         .HasColumnType("date");
 
                     b.HasKey("Id");
@@ -1285,10 +1283,6 @@ namespace VoucherMgt.DAL.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
-                    b.Property<string>("Contact")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<DateTimeOffset?>("CreatedOn")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("CreatedOn");
@@ -1299,14 +1293,6 @@ namespace VoucherMgt.DAL.Migrations
                     b.Property<DateTimeOffset?>("LastUpdatedOn")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("LastUpdatedOn");
-
-                    b.Property<string>("LogoFileName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("LogoFilePath")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1663,3 +1649,4 @@ namespace VoucherMgt.DAL.Migrations
         }
     }
 }
+

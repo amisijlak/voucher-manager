@@ -90,6 +90,15 @@ public class TradingCompany : BaseEntity
     [Required, MaxLength(80)]
     public string ShortName { get; set; } = string.Empty;
 
+    [MaxLength(200)]
+    public string? Contact { get; set; }
+
+    [MaxLength(300)]
+    public string? LogoFilePath { get; set; }
+
+    [MaxLength(200)]
+    public string? LogoFileName { get; set; }
+
     [MaxLength(80)]
     public string? AccountNumber { get; set; }
 

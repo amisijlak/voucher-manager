@@ -15,17 +15,19 @@ public class EditModel : PageModel
     private readonly IProcurementService _procurement;
     private readonly IRepository _repository;
     private readonly IOrganizationScope _scope;
+    private readonly IWebHostEnvironment _environment;
 
-    public EditModel(IProcurementService procurement, IRepository repository, IOrganizationScope scope)
+    public EditModel(IProcurementService procurement, IRepository repository, IOrganizationScope scope, IWebHostEnvironment environment)
     {
         _procurement = procurement;
         _repository = repository;
         _scope = scope;
+        _environment = environment;
     }
 
     [BindProperty] public OrderInput Input { get; set; } = new();
     public List<TradingCompany> Companies { get; private set; } = [];
-    public List<Requisition> Requisitions { get; private set; } = [];
+    public decimal VatRate { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int? id, CancellationToken cancellationToken)
     {
@@ -55,6 +57,14 @@ public class EditModel : PageModel
         return Page();
     }
 
+    public async Task<IActionResult> OnGetLogoAsync(int companyId, CancellationToken cancellationToken)
+    {
+        var organization = await _scope.GetRequiredAsync(cancellationToken);
+        var company = await _repository.Set<TradingCompany>()
+            .FirstOrDefaultAsync(c => c.Id == companyId && c.OrganizationId == organization.Id && c.IsActive, cancellationToken);
+        return company is null ? NotFound() : CompanyLogos.Open(_environment, company, organization.Id);
+    }
+
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         var result = await _procurement.SaveOrderAsync(ToDraft(), cancellationToken);
@@ -80,11 +90,7 @@ public class EditModel : PageModel
             .Where(c => c.OrganizationId == organization.Id && c.IsActive)
             .OrderBy(c => c.Name)
             .ToListAsync(cancellationToken);
-        Requisitions = await _repository.Set<Requisition>()
-            .Where(r => r.OrganizationId == organization.Id && r.Status != RequisitionStatus.Rejected)
-            .OrderByDescending(r => r.CreatedOn)
-            .Take(40)
-            .ToListAsync(cancellationToken);
+        VatRate = organization.DefaultVatRate;
         return organization;
     }
 

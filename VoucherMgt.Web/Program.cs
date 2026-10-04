@@ -19,6 +19,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/Requisitions/Details", Policy(AppPermissions.RequisitionsView));
     options.Conventions.AuthorizePage("/Approvals/Index", Policy(AppPermissions.ApprovalsView));
     options.Conventions.AuthorizePage("/Accountability/Index", Policy(AppPermissions.AccountabilityView));
+    options.Conventions.AuthorizePage("/Accountability/Details", Policy(AppPermissions.AccountabilityView));
     options.Conventions.AuthorizePage("/Accountability/Edit", Policy(AppPermissions.AccountabilitySubmit));
     options.Conventions.AuthorizePage("/Orders/Index", Policy(AppPermissions.OrdersView));
     options.Conventions.AuthorizePage("/Orders/Edit", Policy(AppPermissions.OrdersCreate));
