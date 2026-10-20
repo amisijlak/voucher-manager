@@ -28,6 +28,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizePage("/Invoices/Index", Policy(AppPermissions.InvoicesView));
     options.Conventions.AuthorizePage("/Invoices/Edit", Policy(AppPermissions.InvoicesCreate));
     options.Conventions.AuthorizePage("/Invoices/Details", Policy(AppPermissions.InvoicesView));
+    options.Conventions.AuthorizePage("/Invoices/Print", Policy(AppPermissions.InvoicesView));
     options.Conventions.AuthorizePage("/Budgets/Index", Policy(AppPermissions.BudgetsView));
     options.Conventions.AuthorizePage("/Budgets/Details", Policy(AppPermissions.BudgetsView));
     options.Conventions.AuthorizePage("/Reports/Index", Policy(AppPermissions.ReportsView));

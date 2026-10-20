@@ -111,7 +111,12 @@ public sealed class ProcurementService : IProcurementService
         var order = await _repository.Set<OrderForm>()
             .Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == id && o.OrganizationId == organization.Id, cancellationToken);
-        if (order is null || order.Status != OrderStatus.Draft)
+        if (order is null)
+        {
+            return WorkflowResult.Fail("The order was not found.");
+        }
+
+        if (order.Status != OrderStatus.Draft)
         {
             return WorkflowResult.Fail("Only a draft order can be issued.");
         }

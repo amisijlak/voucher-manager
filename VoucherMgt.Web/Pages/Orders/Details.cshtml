@@ -7,65 +7,353 @@
     var item = Model.Item;
 }
 <partial name="_Breadcrumb" />
-<div class="content-panel">
-    <div class="page-heading">
-        <div>
-            <h1>@item.Number <span class="badge @StatusText.Badge(item.Status)">@item.Status</span></h1>
-            <p>@item.TradingCompany.Name · @item.PartyName · @(item.Direction == OrderDirection.Purchase ? "Purchase order" : "Client order")</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-primary" asp-page="Print" asp-route-id="@item.Id" target="_blank">Print</a>
-            @if (item.Status == OrderStatus.Draft)
+<div class="content-panel order-sheet">
+    <div class="order-letterhead">
+        <div class="order-logos">
+            @foreach (var company in Model.Companies)
             {
-                <a class="btn btn-outline-primary" asp-page="Edit" asp-route-id="@item.Id">Edit</a>
-            }
-            @if (item.Status is OrderStatus.Issued or OrderStatus.PartiallyInvoiced or OrderStatus.Invoiced)
-            {
-                <a class="btn btn-primary" asp-page="/Invoices/Edit" asp-route-orderId="@item.Id">Raise invoice</a>
+                <div class="order-logo">
+                    <div class="order-logo-mark">
+                        @if (company.LogoFilePath is not null)
+                        {
+                            <img src="@Url.Page(null, "Logo", new { companyId = company.Id })" alt="" />
+                        }
+                        else
+                        {
+                            <span>@company.ShortName</span>
+                        }
+                    </div>
+                    <strong>@company.Name</strong>
+                    @if (!string.IsNullOrWhiteSpace(company.Contact))
+                    {
+                        <small>@company.Contact</small>
+                    }
+                </div>
             }
         </div>
+        <h1 class="order-form-title">Order form</h1>
+        <p class="order-form-meta">@item.Number <span class="badge @StatusText.Badge(item.Status)">@item.Status</span></p>
     </div>
-    <p class="mb-1">Net @Money.FormatPair(item.NetUgx, item.NetUsd)</p>
-    <p class="mb-1">VAT @item.VatRate.ToString("0.##")% (@item.VatMode) @Money.FormatPair(item.VatUgx, item.VatUsd)</p>
-    <p class="fw-bold">Gross @Money.FormatPair(item.GrossUgx, item.GrossUsd)</p>
+    @{
+        var invoices = item.Invoices.Where(i => i.Status != InvoiceStatus.Cancelled).OrderBy(i => i.Number).ToList();
+        var draftInvoice = invoices.FirstOrDefault(i => i.Status == InvoiceStatus.Draft);
+        var issuedInvoice = invoices.FirstOrDefault(i => i.Status == InvoiceStatus.Issued);
+        var approvedInvoice = invoices.FirstOrDefault(i => i.Status == InvoiceStatus.Approved);
+        var liveInvoices = invoices.Where(i => i.Status != InvoiceStatus.Draft).ToList();
+        var cancelled = item.Status == OrderStatus.Cancelled;
+        var fullyInvoiced = item.Status is OrderStatus.Invoiced or OrderStatus.Closed;
+        var allPaid = fullyInvoiced && liveInvoices.Count > 0 && draftInvoice is null && liveInvoices.All(i => i.Status == InvoiceStatus.Paid);
+        int here;
+        string progress;
+        if (cancelled)
+        {
+            here = liveInvoices.Count == 0 ? 1 : 3;
+            progress = "This order was cancelled. It stops here.";
+        }
+        else if (item.Status == OrderStatus.Draft)
+        {
+            here = 1;
+            progress = "This order is a draft. Issue it to lock the form. The next step is to raise an invoice.";
+        }
+        else if (liveInvoices.Count == 0)
+        {
+            here = draftInvoice is null ? 2 : 3;
+            progress = draftInvoice is null
+                ? "The order is issued. Raise an invoice to convert it."
+                : $"{draftInvoice.Number} is a draft invoice. Issue it to complete the conversion.";
+        }
+        else if (!fullyInvoiced || draftInvoice is not null)
+        {
+            here = 3;
+            progress = draftInvoice is not null
+                ? $"{draftInvoice.Number} is still a draft. Issue it to continue the conversion."
+                : "Part of this order is invoiced. Raise an invoice for the balance.";
+        }
+        else if (issuedInvoice is not null)
+        {
+            here = 4;
+            progress = $"The order is invoiced. Approve {issuedInvoice.Number}.";
+        }
+        else if (!allPaid)
+        {
+            here = 5;
+            progress = $"Record the payment on {(approvedInvoice ?? liveInvoices.First(i => i.Status != InvoiceStatus.Paid)).Number}.";
+        }
+        else
+        {
+            here = 6;
+            progress = "Payment is recorded. This order is complete.";
+        }
+
+        string StepClass(int step)
+        {
+            if (cancelled && step == here) return "failed";
+            if (cancelled && step > here) return "wait";
+            if (step < here) return "done";
+            if (step == here) return "current";
+            return "wait";
+        }
+
+        string Mark(int step) => StepClass(step) == "failed" ? "!" : StepClass(step).Contains("done") ? "✓" : step.ToString();
+        var companyName = item.TradingCompany?.Name;
+    }
+    <div class="req-wizard" aria-label="Order progress">
+        <ol class="req-wizard-steps order-timeline">
+            <li class="@StepClass(1)">
+                <span class="req-wizard-mark">@Mark(1)</span>
+                <span class="req-wizard-name">Draft</span>
+                <span class="req-wizard-hint">Order saved</span>
+                <span class="req-wizard-step-action">
+                    @if (StepClass(1) == "current")
+                    {
+                        if (Model.CanIssue)
+                        {
+                            <form method="post" asp-page-handler="Issue" asp-route-id="@item.Id">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button class="btn btn-primary" type="submit">Issue order</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="req-wizard-wait">Waiting to be issued.</span>
+                        }
+                        <a class="btn btn-outline-primary" asp-page="Edit" asp-route-id="@item.Id">Edit</a>
+                    }
+                    else if (StepClass(1) == "done")
+                    {
+                        <span class="req-wizard-hint">Done</span>
+                    }
+                    else
+                    {
+                        <span class="req-wizard-wait">Issue order</span>
+                    }
+                </span>
+            </li>
+            <li class="@StepClass(2)">
+                <span class="req-wizard-mark">@Mark(2)</span>
+                <span class="req-wizard-name">Issued</span>
+                <span class="req-wizard-hint">Raise invoice</span>
+                <span class="req-wizard-step-action">
+                    @if (StepClass(2) == "current")
+                    {
+                        if (Model.CanCreateInvoice)
+                        {
+                            <a class="btn btn-primary" asp-page="/Invoices/Edit" asp-route-orderId="@item.Id">Raise invoice</a>
+                        }
+                        else
+                        {
+                            <span class="req-wizard-wait">Waiting for an invoice.</span>
+                        }
+                    }
+                    else if (StepClass(2) == "done")
+                    {
+                        <span class="req-wizard-hint">Done</span>
+                    }
+                    else
+                    {
+                        <span class="req-wizard-wait">Raise invoice</span>
+                    }
+                </span>
+            </li>
+            <li class="@StepClass(3)">
+                <span class="req-wizard-mark">@Mark(3)</span>
+                <span class="req-wizard-name">Invoiced</span>
+                <span class="req-wizard-hint">@(draftInvoice is null && liveInvoices.Count > 0 && !fullyInvoiced ? "Cover the balance" : "Issue invoice")</span>
+                <span class="req-wizard-step-action">
+                    @if (StepClass(3) == "current")
+                    {
+                        if (draftInvoice is not null && Model.CanCreateInvoice)
+                        {
+                            <form method="post" asp-page-handler="IssueInvoice" asp-route-id="@item.Id">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <input type="hidden" name="invoiceId" value="@draftInvoice.Id" />
+                                <button class="btn btn-primary" type="submit">Issue @draftInvoice.Number</button>
+                            </form>
+                        }
+                        else if (draftInvoice is not null)
+                        {
+                            <span class="req-wizard-wait">Waiting for @draftInvoice.Number to be issued.</span>
+                        }
+                        else if (Model.CanCreateInvoice)
+                        {
+                            <a class="btn btn-primary" asp-page="/Invoices/Edit" asp-route-orderId="@item.Id">Raise invoice</a>
+                        }
+                        else
+                        {
+                            <span class="req-wizard-wait">Waiting for the balance to be invoiced.</span>
+                        }
+                    }
+                    else if (StepClass(3) == "done")
+                    {
+                        <span class="req-wizard-hint">Done</span>
+                    }
+                    else
+                    {
+                        <span class="req-wizard-wait">Issue invoice</span>
+                    }
+                </span>
+            </li>
+            <li class="@StepClass(4)">
+                <span class="req-wizard-mark">@Mark(4)</span>
+                <span class="req-wizard-name">Approved</span>
+                <span class="req-wizard-hint">Approve invoice</span>
+                <span class="req-wizard-step-action">
+                    @if (StepClass(4) == "current" && issuedInvoice is not null)
+                    {
+                        if (Model.CanApproveInvoice)
+                        {
+                            <form method="post" asp-page-handler="ApproveInvoice" asp-route-id="@item.Id">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <input type="hidden" name="invoiceId" value="@issuedInvoice.Id" />
+                                <button class="btn btn-primary" type="submit">Approve @issuedInvoice.Number</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="req-wizard-wait">Waiting for an approver.</span>
+                        }
+                    }
+                    else if (StepClass(4) == "done")
+                    {
+                        <span class="req-wizard-hint">Done</span>
+                    }
+                    else
+                    {
+                        <span class="req-wizard-wait">Approve invoice</span>
+                    }
+                </span>
+            </li>
+            <li class="@StepClass(5)">
+                <span class="req-wizard-mark">@Mark(5)</span>
+                <span class="req-wizard-name">Paid</span>
+                <span class="req-wizard-hint">Record payment</span>
+                <span class="req-wizard-step-action">
+                    @if (StepClass(5) == "current")
+                    {
+                        var payable = approvedInvoice ?? liveInvoices.FirstOrDefault(i => i.Status != InvoiceStatus.Paid);
+                        if (payable is not null && Model.CanPayInvoice)
+                        {
+                            <a class="btn btn-primary" asp-page="/Invoices/Details" asp-route-id="@payable.Id">Record payment</a>
+                        }
+                        else if (payable is not null)
+                        {
+                            <a class="btn btn-outline-primary" asp-page="/Invoices/Details" asp-route-id="@payable.Id">Open @payable.Number</a>
+                        }
+                        else
+                        {
+                            <span class="req-wizard-wait">Waiting for payment.</span>
+                        }
+                    }
+                    else if (StepClass(5) == "done")
+                    {
+                        <span class="req-wizard-hint">Done</span>
+                    }
+                    else
+                    {
+                        <span class="req-wizard-wait">Record payment</span>
+                    }
+                </span>
+            </li>
+        </ol>
+        <div class="req-wizard-note"><i class="bi bi-signpost-2"></i><span>@progress</span></div>
+        @if (item.Invoices.Count > 0)
+        {
+            <div class="req-wizard-action">
+                @foreach (var invoice in item.Invoices.OrderBy(i => i.Number))
+                {
+                    <a class="btn btn-outline-primary btn-sm" asp-page="/Invoices/Details" asp-route-id="@invoice.Id">@invoice.Number · @invoice.Status</a>
+                }
+            </div>
+        }
+    </div>
+    <div class="order-facts">
+        <div><span>Client name</span><strong>@item.PartyName</strong></div>
+        @if (!string.IsNullOrWhiteSpace(item.ContactName))
+        {
+            <div><span>Contact name</span><strong>@item.ContactName</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.InvoiceName))
+        {
+            <div><span>Invoice name</span><strong>@item.InvoiceName</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.Address))
+        {
+            <div><span>Address</span><strong>@item.Address</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.CityTown))
+        {
+            <div><span>City / town</span><strong>@item.CityTown</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.Country))
+        {
+            <div><span>Country</span><strong>@item.Country</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.Phone))
+        {
+            <div><span>Phone</span><strong>@item.Phone</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.Fax))
+        {
+            <div><span>Fax</span><strong>@item.Fax</strong></div>
+        }
+        @if (!string.IsNullOrWhiteSpace(item.Email))
+        {
+            <div><span>Email address</span><strong>@item.Email</strong></div>
+        }
+    </div>
+    <div class="order-agree-line">
+        <span>I/We hereby agree to do business with @companyName</span>
+        <span class="company-pay-note">All payments should be made to respective company accounts</span>
+    </div>
     <div class="table-responsive">
-        <table class="table">
-            <thead><tr><th>Description</th><th>Qty</th><th class="text-end">Unit</th><th class="text-end">Amount</th></tr></thead>
+        <table class="table req-lines">
+            <thead><tr><th>Quantity</th><th>Description</th><th class="text-end">Unit price</th><th>Currency</th><th class="text-end">Amount</th></tr></thead>
             <tbody>
             @foreach (var line in item.Lines.OrderBy(l => l.LineNumber))
             {
                 <tr>
-                    <td>
-                        @line.Description
-                        @if (item.Kind == OrderKind.Advertising)
-                        {
-                            <div class="small text-muted">@line.Programme @line.LengthSeconds s · @line.Insertions insertions</div>
-                        }
-                    </td>
                     <td>@line.Quantity.ToString("0.##")</td>
-                    <td class="text-end">@Money.Format(line.UnitPrice, line.Currency)</td>
-                    <td class="text-end">@Money.Format(line.Amount, line.Currency)</td>
+                    <td>@line.Description</td>
+                    <td class="text-end">@Money.FormatNumber(line.UnitPrice, line.Currency)</td>
+                    <td>@line.Currency</td>
+                    <td class="text-end num">@Money.Format(line.Amount, line.Currency)</td>
                 </tr>
             }
             </tbody>
         </table>
     </div>
-    @if (item.Invoices.Count > 0)
-    {
-        <h2 class="h6">Invoices</h2>
-        <ul>
-            @foreach (var invoice in item.Invoices)
-            {
-                <li><a asp-page="/Invoices/Details" asp-route-id="@invoice.Id">@invoice.Number</a> · @invoice.Status · @Money.FormatPair(invoice.GrossUgx, invoice.GrossUsd)</li>
-            }
-        </ul>
-    }
-    @if (Model.CanIssue && item.Status == OrderStatus.Draft)
-    {
-        <form method="post" asp-page-handler="Issue" class="d-inline"><button class="btn btn-primary" type="submit">Issue order</button></form>
-    }
-    @if (Model.CanIssue && item.Status is not (OrderStatus.Cancelled or OrderStatus.Closed))
-    {
-        <form method="post" asp-page-handler="Cancel" class="d-inline ms-2"><button class="btn btn-outline-primary" type="submit">Cancel order</button></form>
-    }
+    <div class="order-totals">
+        <div><span>Net total</span><strong>@Money.FormatPair(item.NetUgx, item.NetUsd)</strong></div>
+        <div><span>VAT @item.VatRate.ToString("0.##")%</span><strong>@Money.FormatPair(item.VatUgx, item.VatUsd)</strong></div>
+        <div><span>Gross total</span><strong>@Money.FormatPair(item.GrossUgx, item.GrossUsd)</strong></div>
+    </div>
+    <div class="order-sign">
+        <div>
+            <h2>Client's signature</h2>
+            <div class="order-sign-line"></div>
+            <p>Name in full</p>
+            <div class="order-sign-line">@item.ClientSignatoryName</div>
+            <p>Designation</p>
+            <div class="order-sign-line">@item.ClientDesignation</div>
+            <p>Date</p>
+            <div class="order-sign-line">@item.ClientSignedOn?.ToString("dd MMM yyyy")</div>
+        </div>
+        <div>
+            <h2>Business manager</h2>
+            <div class="order-sign-line">@item.BusinessManager</div>
+            <p>Business sponsor</p>
+            <div class="order-sign-line">@item.BusinessSupervisor</div>
+        </div>
+    </div>
+    <div class="mt-4 d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" asp-page="Print" asp-route-id="@item.Id" target="_blank">Print</a>
+        @if (Model.CanIssue && item.Status is not (OrderStatus.Cancelled or OrderStatus.Closed))
+        {
+            <form method="post" asp-page-handler="Cancel" asp-route-id="@item.Id">
+                <input type="hidden" name="id" value="@item.Id" />
+                <button class="btn btn-outline-primary" type="submit">Cancel order</button>
+            </form>
+        }
+        <a class="btn btn-outline-primary" asp-page="Index">Back</a>
+    </div>
 </div>

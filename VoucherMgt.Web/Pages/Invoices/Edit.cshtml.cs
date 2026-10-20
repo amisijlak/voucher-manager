@@ -15,17 +15,20 @@ public class EditModel : PageModel
     private readonly IProcurementService _procurement;
     private readonly IRepository _repository;
     private readonly IOrganizationScope _scope;
+    private readonly IWebHostEnvironment _environment;
 
-    public EditModel(IProcurementService procurement, IRepository repository, IOrganizationScope scope)
+    public EditModel(IProcurementService procurement, IRepository repository, IOrganizationScope scope, IWebHostEnvironment environment)
     {
         _procurement = procurement;
         _repository = repository;
         _scope = scope;
+        _environment = environment;
     }
 
     [BindProperty] public InvoiceInput Input { get; set; } = new();
     public List<OrderForm> Orders { get; private set; } = [];
     public List<TradingCompany> Companies { get; private set; } = [];
+    public string? Number { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(int? id, int? orderId, CancellationToken cancellationToken)
     {
@@ -36,6 +39,7 @@ public class EditModel : PageModel
                 .FirstOrDefaultAsync(i => i.Id == invoiceId && i.OrganizationId == organization.Id, cancellationToken);
             if (invoice is null) return NotFound();
             if (invoice.Status != InvoiceStatus.Draft) return RedirectToPage("Details", new { id });
+            Number = invoice.Number;
             Input = new InvoiceInput
             {
                 Id = invoice.Id,
@@ -90,6 +94,14 @@ public class EditModel : PageModel
         }
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnGetLogoAsync(int companyId, CancellationToken cancellationToken)
+    {
+        var organization = await _scope.GetRequiredAsync(cancellationToken);
+        var company = await _repository.Set<TradingCompany>()
+            .FirstOrDefaultAsync(c => c.Id == companyId && c.OrganizationId == organization.Id && c.IsActive, cancellationToken);
+        return company is null ? NotFound() : CompanyLogos.Open(_environment, company, organization.Id);
     }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)

@@ -16,13 +16,20 @@ public class DetailsModel : PageModel
     private readonly IOrganizationScope _scope;
     private readonly IProcurementService _procurement;
     private readonly IAuthorizationService _authorization;
+    private readonly IWebHostEnvironment _environment;
 
-    public DetailsModel(IRepository repository, IOrganizationScope scope, IProcurementService procurement, IAuthorizationService authorization)
+    public DetailsModel(
+        IRepository repository,
+        IOrganizationScope scope,
+        IProcurementService procurement,
+        IAuthorizationService authorization,
+        IWebHostEnvironment environment)
     {
         _repository = repository;
         _scope = scope;
         _procurement = procurement;
         _authorization = authorization;
+        _environment = environment;
     }
 
     public Invoice? Item { get; private set; }
@@ -33,6 +40,14 @@ public class DetailsModel : PageModel
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken) =>
         await LoadAsync(id, cancellationToken) ? Page() : NotFound();
+
+    public async Task<IActionResult> OnGetLogoAsync(int companyId, CancellationToken cancellationToken)
+    {
+        var organization = await _scope.GetRequiredAsync(cancellationToken);
+        var company = await _repository.Set<TradingCompany>()
+            .FirstOrDefaultAsync(c => c.Id == companyId && c.OrganizationId == organization.Id && c.IsActive, cancellationToken);
+        return company is null ? NotFound() : CompanyLogos.Open(_environment, company, organization.Id);
+    }
 
     public async Task<IActionResult> OnPostIssueAsync(int id, CancellationToken cancellationToken)
     {
@@ -67,7 +82,7 @@ public class DetailsModel : PageModel
         var organization = await _scope.GetRequiredAsync(cancellationToken);
         Item = await _repository.Set<Invoice>()
             .Include(i => i.Lines)
-            .Include(i => i.OrderForm)
+            .Include(i => i.OrderForm)!.ThenInclude(o => o!.TradingCompany)
             .Include(i => i.TradingCompany)
             .FirstOrDefaultAsync(i => i.Id == id && i.OrganizationId == organization.Id, cancellationToken);
         if (Item is null) return false;
